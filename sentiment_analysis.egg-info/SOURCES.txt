@@ -1,0 +1,15 @@
+README.md
+setup.py
+sentiment_analysis.egg-info/PKG-INFO
+sentiment_analysis.egg-info/SOURCES.txt
+sentiment_analysis.egg-info/dependency_links.txt
+sentiment_analysis.egg-info/requires.txt
+sentiment_analysis.egg-info/top_level.txt
+src/__init__.py
+src/dataset.py
+src/evaluate.py
+src/model.py
+src/predict.py
+src/preprocessing.py
+src/train.py
+tests/test_model.py
