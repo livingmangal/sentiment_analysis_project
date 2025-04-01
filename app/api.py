@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from src.predict import initialize_predictor, predict_sentiment
 import logging
@@ -12,7 +12,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
+app = Flask(__name__, 
+    template_folder='templates',
+    static_folder='static'
+)
 CORS(app, resources={r"/predict": {"origins": "*"}})
 
 # Initialize the predictor
@@ -25,18 +28,8 @@ except Exception as e:
 
 @app.route('/')
 def home() -> str:
-    """Welcome endpoint"""
-    return """
-    Welcome to the Sentiment Analysis API!
-    
-    Endpoints:
-    - POST /predict: Analyze sentiment of text
-    
-    Example request:
-    curl -X POST http://localhost:5000/predict \\
-         -H "Content-Type: application/json" \\
-         -d '{"text": "This movie was fantastic!"}'
-    """
+    """Serve the main page"""
+    return render_template('index.html')
 
 @app.route('/predict', methods=['POST'])
 def predict() -> tuple[Dict[str, Any], int]:

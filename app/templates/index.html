@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentiment Analysis</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Sentiment Analysis</h1>
+            <p>Enter your text below to analyze its sentiment</p>
+        </header>
+
+        <main>
+            <div class="input-section">
+                <form id="sentimentForm" method="POST">
+                    <div class="form-group">
+                        <label for="text">Enter Text:</label>
+                        <textarea 
+                            id="text" 
+                            name="text" 
+                            required 
+                            placeholder="Type your message here..."
+                            rows="4"
+                        ></textarea>
+                    </div>
+                    <button type="submit" id="submit-btn">Analyze Sentiment</button>
+                </form>
+            </div>
+
+            <div class="loading" id="loading-spinner" style="display: none;">
+                <div class="spinner"></div>
+                <p>Analyzing...</p>
+            </div>
+
+            <div class="result-section">
+                <div class="result-card" id="response" style="display: none;">
+                    <!-- Results will be inserted here by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Debug section (hidden in production) -->
+            <div class="debug-section" style="margin-top: 2rem; padding: 1rem; border: 1px solid #ccc; display: none;">
+                <h3>Debug Information</h3>
+                <pre id="debug-output"></pre>
+            </div>
+        </main>
+
+        <footer>
+            <p>Powered by LSTM Neural Network</p>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <script>
+        // Enable debug mode
+        const debugOutput = document.querySelector('#debug-output');
+        const debugSection = document.querySelector('.debug-section');
+        
+        if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+            debugSection.style.display = 'block';
+            console.log = function() {
+                debugOutput.textContent += Array.from(arguments).join(' ') + '\n';
+                console.info.apply(console, arguments);
+            };
+        }
+    </script>
+</body>
+</html>
