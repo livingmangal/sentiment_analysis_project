@@ -3,7 +3,7 @@ services:
     name: sentiment-analysis
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn --bind 0.0.0.0:$PORT main:app --workers 1 --threads 2 --timeout 120
+    startCommand: gunicorn main:app
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.0
@@ -13,6 +13,8 @@ services:
         value: production
       - key: STATIC_URL_PATH
         value: /static
+      - key: WEB_CONCURRENCY
+        value: 1
     staticPublishPath: ./app/static
     healthCheckPath: /
     autoDeploy: true
