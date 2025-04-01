@@ -1,0 +1,81 @@
+text,sentiment
+i love you,1
+love,1
+great,1
+wonderful,1
+excellent,1
+happy,1
+good,1
+amazing,1
+beautiful,1
+fantastic,1
+perfect,1
+awesome,1
+brilliant,1
+delightful,1
+outstanding,1
+superb,1
+marvelous,1
+terrific,1
+fabulous,1
+pleasant,1
+lovely,1
+nice,1
+enjoyable,1
+this makes me happy,1
+you are amazing,1
+this is wonderful,1
+great job,1
+well done,1
+excellent work,1
+you are the best,1
+this is perfect,1
+i am so happy,1
+this is fantastic,1
+you are awesome,1
+this is brilliant,1
+what a great day,1
+this is beautiful,1
+absolutely amazing,1
+incredibly good,1
+truly wonderful,1
+i hate you,0
+hate,0
+terrible,0
+awful,0
+bad,0
+sad,0
+poor,0
+horrible,0
+disgusting,0
+dreadful,0
+pathetic,0
+miserable,0
+disappointing,0
+frustrating,0
+annoying,0
+unpleasant,0
+awful,0
+terrible,0
+horrible,0
+worst,0
+useless,0
+garbage,0
+rubbish,0
+this makes me sad,0
+you are terrible,0
+this is horrible,0
+poor job,0
+badly done,0
+terrible work,0
+you are the worst,0
+this is awful,0
+i am so sad,0
+this is terrible,0
+you are horrible,0
+this is pathetic,0
+what a bad day,0
+this is disgusting,0
+absolutely terrible,0
+incredibly bad,0
+truly awful,0
