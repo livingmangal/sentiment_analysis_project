@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sentiment Analysis</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="http://localhost:5000/static/css/style.css">
 </head>
 <body>
     <div class="container">
@@ -28,7 +28,12 @@
         <div id="response" style="display: none;"></div>
     </div>
 
-    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <script>
+        // Determine the base URL based on whether we're running through Flask or directly
+        const baseUrl = 'http://localhost:5000';
+        console.log('Base URL:', baseUrl);
+    </script>
+    <script src="http://localhost:5000/static/js/script.js"></script>
 </body>
 </html> 
 
