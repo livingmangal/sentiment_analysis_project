@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, send_from_directory
 from flask_cors import CORS
 from src.predict import initialize_predictor, predict_sentiment
 import logging
@@ -13,10 +13,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Get static URL path from environment or default to /static
+static_url_path = os.environ.get('STATIC_URL_PATH', '/static')
+
 app = Flask(__name__, 
     template_folder='templates',
-    static_folder='static'
+    static_folder='static',
+    static_url_path=static_url_path
 )
+
+# Configure app
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+app.config['TEMPLATES_AUTO_RELOAD'] = True
 
 # Configure CORS
 CORS(app, 
@@ -40,6 +48,11 @@ except Exception as e:
 def home() -> str:
     """Serve the main page"""
     return render_template('index.html')
+
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    """Serve static files"""
+    return send_from_directory(app.static_folder, filename)
 
 @app.route('/predict', methods=['POST', 'OPTIONS'])
 def predict() -> tuple[Dict[str, Any], int]:

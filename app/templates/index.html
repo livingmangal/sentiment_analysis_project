@@ -3,29 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Sentiment Analysis Web Application">
+    <meta name="theme-color" content="#4a90e2">
     <title>Sentiment Analysis</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="container">
-        <h2>Sentiment Analysis</h2>
+        <header>
+            <h2>Sentiment Analysis</h2>
+            <p class="subtitle">Analyze the sentiment of any text</p>
+        </header>
         
-        <form id="sentimentForm">
-            <div class="form-group">
-                <label for="text">Enter your text:</label>
-                <input 
-                    type="text" 
-                    id="text" 
-                    name="text" 
-                    required 
-                    placeholder="Type something to analyze..."
-                    autocomplete="off"
-                >
-            </div>
-            <button type="submit">Analyze Sentiment</button>
-        </form>
+        <main>
+            <form id="sentimentForm">
+                <div class="form-group">
+                    <label for="text">Enter your text:</label>
+                    <input 
+                        type="text" 
+                        id="text" 
+                        name="text" 
+                        required 
+                        placeholder="Type something to analyze..."
+                        autocomplete="off"
+                        aria-label="Text input for sentiment analysis"
+                    >
+                </div>
+                <button type="submit" aria-label="Analyze sentiment">
+                    <span class="button-text">Analyze Sentiment</span>
+                    <span class="button-icon">🔍</span>
+                </button>
+            </form>
 
-        <div id="response" style="display: none;"></div>
+            <div id="response" style="display: none;" role="alert" aria-live="polite"></div>
+        </main>
+
+        <footer>
+            <p>Built with ❤️ using Flask and PyTorch</p>
+        </footer>
     </div>
 
     <script>
@@ -33,7 +51,7 @@
         const baseUrl = window.location.origin;
         console.log('Base URL:', baseUrl);
     </script>
-    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <script src="/static/js/script.js"></script>
 </body>
 </html> 
 

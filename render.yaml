@@ -3,9 +3,20 @@ services:
     name: sentiment-analysis
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: python main.py
+    startCommand: gunicorn --bind 0.0.0.0:$PORT main:app --workers 1 --threads 2 --timeout 120
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.0
-      - key: PORT
-        value: 10000 
+      - key: PYTHONUNBUFFERED
+        value: true
+      - key: FLASK_ENV
+        value: production
+      - key: STATIC_URL_PATH
+        value: /static
+    staticPublishPath: ./app/static
+    healthCheckPath: /
+    autoDeploy: true
+    disk:
+      name: models
+      mountPath: /models
+      sizeGB: 1 

@@ -7,6 +7,10 @@ from src.preprocessing import TextPreprocessor
 class SentimentPredictor:
     def __init__(self, model_path: str, preprocessor_path: str):
         """Initialize the sentiment predictor with model and preprocessor"""
+        # Ensure paths are absolute
+        model_path = os.path.abspath(model_path)
+        preprocessor_path = os.path.abspath(preprocessor_path)
+        
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"Model file not found at {model_path}")
         if not os.path.exists(preprocessor_path):
@@ -32,8 +36,8 @@ class SentimentPredictor:
         # Set model to evaluation mode
         self.model.eval()
         
-        # Move model to GPU if available
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        # Move model to CPU for Render deployment
+        self.device = torch.device('cpu')
         self.model = self.model.to(self.device)
     
     def predict(self, text: str) -> dict:

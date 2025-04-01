@@ -17,23 +17,39 @@
 }
 
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     line-height: 1.6;
     background: var(--bg-color);
     color: var(--text-color);
-    padding: 2rem;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
-    align-items: center;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 3rem;
 }
 
 h2 {
     color: var(--primary-color);
-    text-align: center;
-    margin-bottom: 2rem;
     font-size: 2.5rem;
+    margin-bottom: 0.5rem;
     text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.subtitle {
+    color: #666;
+    font-size: 1.1rem;
 }
 
 /* Form Styling */
@@ -43,7 +59,6 @@ h2 {
     border-radius: 10px;
     box-shadow: var(--shadow);
     width: 100%;
-    max-width: 600px;
     margin: 0 auto;
     transition: var(--transition);
 }
@@ -61,7 +76,8 @@ label {
     display: block;
     margin-bottom: 0.5rem;
     color: var(--text-color);
-    font-weight: 600;
+    font-weight: 500;
+    font-size: 1.1rem;
 }
 
 input[type="text"] {
@@ -71,6 +87,7 @@ input[type="text"] {
     border-radius: 5px;
     font-size: 1rem;
     transition: var(--transition);
+    font-family: inherit;
 }
 
 input[type="text"]:focus {
@@ -89,6 +106,10 @@ button {
     font-size: 1.1rem;
     cursor: pointer;
     transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
 }
 
 button:hover {
@@ -98,6 +119,10 @@ button:hover {
 
 button:active {
     transform: translateY(0);
+}
+
+.button-icon {
+    font-size: 1.2rem;
 }
 
 /* Response Styling */
@@ -142,6 +167,7 @@ button:active {
     border-top: 4px solid var(--primary-color);
     border-radius: 50%;
     animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
 }
 
 @keyframes spin {
@@ -149,9 +175,17 @@ button:active {
     100% { transform: rotate(360deg); }
 }
 
+/* Footer */
+footer {
+    text-align: center;
+    margin-top: 3rem;
+    padding: 1rem;
+    color: #666;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
-    body {
+    .container {
         padding: 1rem;
     }
 
@@ -182,7 +216,7 @@ button:active {
 
 /* Emoji Animation */
 .emoji {
-    font-size: 2rem;
+    font-size: 2.5rem;
     display: inline-block;
     margin-right: 1rem;
     animation: bounce 0.5s ease;
@@ -198,4 +232,23 @@ button:active {
     60% {
         transform: translateY(-10px);
     }
+}
+
+/* Result Content */
+.result-content {
+    margin-top: 1rem;
+}
+
+.result-content h3 {
+    color: var(--text-color);
+    margin-bottom: 1rem;
+}
+
+.result-content p {
+    margin-bottom: 0.5rem;
+}
+
+.result-content strong {
+    color: var(--primary-color);
+} 
 } 
