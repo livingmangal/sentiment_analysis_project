@@ -1,101 +1,88 @@
-// Wait for DOM to be fully loaded
-document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById("sentimentForm");
-    const textInput = document.getElementById("text");
-    const responseElement = document.getElementById("response");
-    const loadingSpinner = document.getElementById("loading-spinner");
+document.getElementById("sentimentForm").addEventListener("submit", async function(event) {
+    event.preventDefault();  // Prevent form from reloading the page
 
-    // Check if elements exist
-    if (!form || !textInput || !responseElement || !loadingSpinner) {
-        console.error("Required elements not found!");
+    const text = document.getElementById("text").value.trim();
+    const responseElement = document.getElementById("response");
+
+    if (!text) {
+        showResponse("Error: Please enter some text!", true);
         return;
     }
 
-    form.addEventListener("submit", async function(event) {
-        event.preventDefault();  // Prevent form from submitting normally
-        console.log("Form submitted");
+    // Show loading animation
+    showLoading(true);
+    hideResponse();
 
-        const text = textInput.value.trim();
-        console.log("Input text:", text);
+    try {
+        const response = await fetch("/predict", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ text: text })
+        });
 
-        if (!text) {
-            showError("Please enter some text to analyze");
-            return;
+        if (!response.ok) {
+            throw new Error(`Server error: ${response.status}`);
         }
 
-        // Show loading spinner and hide previous results
-        loadingSpinner.style.display = "block";
-        responseElement.style.display = "none";
-
-        try {
-            console.log("Sending request to server...");
-            // Make sure we're sending to the /predict endpoint
-            const response = await fetch("/predict", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Accept": "application/json"
-                },
-                body: JSON.stringify({ text: text })
-            });
-
-            console.log("Response status:", response.status);
-            
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error || `Server error: ${response.status}`);
-            }
-
-            const data = await response.json();
-            console.log("Server response:", data);
-            
-            if (!data.sentiment || typeof data.confidence === 'undefined') {
-                throw new Error("Invalid response format from server");
-            }
-
-            // Create result HTML
-            const resultHTML = `
-                <h2>Analysis Result</h2>
-                <div class="sentiment-display">
-                    <div class="sentiment-icon">
-                        <span>${data.sentiment === 'Positive' ? '😊' : '😔'}</span>
-                    </div>
-                    <div class="sentiment-details">
-                        <p>Sentiment: <strong>${data.sentiment}</strong></p>
-                        <p>Confidence: <strong>${(data.confidence * 100).toFixed(1)}%</strong></p>
-                    </div>
-                </div>
-            `;
-            
-            responseElement.innerHTML = resultHTML;
-            responseElement.style.display = "block";
-            responseElement.style.borderLeft = `4px solid ${data.sentiment === 'Positive' ? 'var(--success-color)' : 'var(--danger-color)'}`;
-        } catch (error) {
-            console.error("Error:", error);
-            showError(error.message);
-        } finally {
-            loadingSpinner.style.display = "none";
-        }
-    });
+        const data = await response.json();
+        
+        // Create result HTML with emoji
+        const emoji = data.sentiment === 'Positive' ? '😊' : '😔';
+        const resultHTML = `
+            <div class="emoji">${emoji}</div>
+            <div class="result-content">
+                <h3>Analysis Result</h3>
+                <p>Sentiment: <strong>${data.sentiment}</strong></p>
+                <p>Confidence: <strong>${(data.confidence * 100).toFixed(1)}%</strong></p>
+            </div>
+        `;
+        
+        showResponse(resultHTML, false, data.sentiment === 'Positive');
+    } catch (error) {
+        showResponse(`Error: ${error.message}`, true);
+    } finally {
+        showLoading(false);
+    }
 });
 
-function showError(message) {
-    console.log("Showing error:", message);
+function showResponse(html, isError, isPositive = null) {
     const responseElement = document.getElementById("response");
-    if (!responseElement) {
-        console.error("Response element not found!");
-        return;
-    }
-
-    responseElement.innerHTML = `
-        <h2 style="color: var(--danger-color)">Error</h2>
-        <p>${message}</p>
-    `;
-    responseElement.style.display = "block";
-    responseElement.style.borderLeft = "4px solid var(--danger-color)";
+    responseElement.innerHTML = html;
+    responseElement.className = "fade-in";
     
-    const loadingSpinner = document.getElementById("loading-spinner");
-    if (loadingSpinner) {
-        loadingSpinner.style.display = "none";
+    if (isError) {
+        responseElement.classList.add("error");
+    } else if (isPositive !== null) {
+        responseElement.classList.add(isPositive ? "success" : "error");
     }
+    
+    responseElement.style.display = "block";
+    responseElement.classList.add("show");
 }
+
+function hideResponse() {
+    const responseElement = document.getElementById("response");
+    responseElement.style.display = "none";
+    responseElement.className = "";
+}
+
+function showLoading(show) {
+    const loadingElement = document.querySelector(".loading");
+    if (!loadingElement) {
+        // Create loading element if it doesn't exist
+        const loading = document.createElement("div");
+        loading.className = "loading";
+        loading.innerHTML = `
+            <div class="spinner"></div>
+            <p>Analyzing sentiment...</p>
+        `;
+        document.getElementById("sentimentForm").after(loading);
+    }
+    document.querySelector(".loading").style.display = show ? "block" : "none";
+}
+
+// old one 
+// fetch("/predict", {
+//     fetch("http://127.0.0.1:5000/predict", {
