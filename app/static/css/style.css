@@ -19,11 +19,36 @@
 body {
     font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     line-height: 1.6;
-    background: var(--bg-color);
     color: var(--text-color);
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    position: relative;
+    overflow-x: hidden;
+}
+
+/* Background styling */
+.background-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -2;
+    background-image: url('/static/images/background.webp');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+.background-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.7) 100%);
+    z-index: -1;
 }
 
 .container {
@@ -33,11 +58,17 @@ body {
     flex: 1;
     display: flex;
     flex-direction: column;
+    position: relative;
+    z-index: 1;
 }
 
 header {
     text-align: center;
     margin-bottom: 3rem;
+    background: rgba(255, 255, 255, 0.8);
+    padding: 2rem;
+    border-radius: 10px;
+    box-shadow: var(--shadow);
 }
 
 h2 {
@@ -54,13 +85,14 @@ h2 {
 
 /* Form Styling */
 #sentimentForm {
-    background: var(--card-bg);
+    background: rgba(255, 255, 255, 0.9);
     padding: 2rem;
     border-radius: 10px;
     box-shadow: var(--shadow);
     width: 100%;
     margin: 0 auto;
     transition: var(--transition);
+    backdrop-filter: blur(5px);
 }
 
 #sentimentForm:hover {
@@ -88,6 +120,7 @@ input[type="text"] {
     font-size: 1rem;
     transition: var(--transition);
     font-family: inherit;
+    background: rgba(255, 255, 255, 0.9);
 }
 
 input[type="text"]:focus {
@@ -130,11 +163,12 @@ button:active {
     margin-top: 2rem;
     padding: 1.5rem;
     border-radius: 10px;
-    background: var(--card-bg);
+    background: rgba(255, 255, 255, 0.9);
     box-shadow: var(--shadow);
     transition: var(--transition);
     opacity: 0;
     transform: translateY(20px);
+    backdrop-filter: blur(5px);
 }
 
 #response.show {
@@ -179,8 +213,25 @@ button:active {
 footer {
     text-align: center;
     margin-top: 3rem;
-    padding: 1rem;
+    padding: 1.5rem;
     color: #666;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+}
+
+footer p {
+    margin-bottom: 0.5rem;
+}
+
+footer p:last-child {
+    margin-bottom: 0;
+}
+
+.copyright {
+    font-size: 0.9rem;
+    color: #888;
+    font-style: italic;
 }
 
 /* Responsive Design */
@@ -250,5 +301,4 @@ footer {
 
 .result-content strong {
     color: var(--primary-color);
-} 
 } 
