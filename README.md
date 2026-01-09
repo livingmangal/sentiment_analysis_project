@@ -2,7 +2,7 @@
 
 A modern web application for analyzing the sentiment of text using deep learning. Built with Flask, PyTorch, and a beautiful responsive UI.
 
-![Sentiment Analysis App](app/static/images/background.webp)
+![Sentiment Analysis App](app/static/images/backgrounD.webp)
 
 ## Features
 
@@ -141,5 +141,5 @@ Copyright rights reserved to MS, 2024
 
 ## Acknowledgements
 
-- Built with ❤️ using Flask and PyTorch
+- Built using Flask and PyTorch
 - Inspired by the need for accessible sentiment analysis tools
