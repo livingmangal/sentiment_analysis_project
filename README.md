@@ -4,6 +4,11 @@ A modern web application for analyzing the sentiment of text using deep learning
 
 ![Sentiment Analysis App](app/static/images/backgrounD.webp)
 
+## 🚀 Live Demo
+
+🔗 **Live Application:** [Click here to open](https://sentiment-analysis-project-oyz1.onrender.com/)
+
+
 ## Features
 
 - **Text Sentiment Analysis**: Analyze any text to determine if it's positive or negative
