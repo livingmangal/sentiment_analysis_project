@@ -1,0 +1,34 @@
+# GitHub Issues for Sentiment Analysis Project
+
+## 🔴 Easy Issues (Good First Issues)
+### 1. [DATASET] Add / Improve Training Dataset
+### 2. [BUG] Add Input Text Length Validation
+### 3. [ENHANCEMENT] Replace Single-line Input with Textarea
+### 4. [CLEANUP] Remove Console.log Statements from Production Code
+### 5. [ENHANCEMENT] Add Loading State to Submit Button
+### 6. [ENHANCEMENT] Add Character Counter to Input Field
+### 7. [ENHANCEMENT] Add Input Validation for Empty/Whitespace Text
+### 8. [TEST] Add Unit Tests for API Endpoints
+### 9. [SECURITY] Restrict CORS Origins in Production
+### 10. [DOCUMENTATION] Add API Documentation with Examples
+### 11. [ENHANCEMENT] Improve Error Messages for End Users
+
+
+## 🟡 Medium Issues
+### 12. [FEATURE] Add Neutral Sentiment Classification
+### 13. [FEATURE] Add Rate Limiting to API
+### 14. [FEATURE] Add Batch Prediction Endpoint
+### 15. [ENHANCEMENT] Add Request Logging and Analytics
+### 16. [FEATURE] Add Model Version Information to API Response
+
+## 🔴 Difficult Issues
+### 17. [FEATURE] Implement Model Caching and Optimization
+### 18. [FEATURE] Add User Session and Prediction History
+### 19. [FEATURE] Implement Model Versioning System
+### 20. [FEATURE] Add Multi-language Support
+### 21. [FEATURE] Implement Real-time Model Fine-tuning
+### 22. [FEATURE] Add Sentiment Trend Analysis and Visualization
+### 23. [FEATURE] Implement A/B Testing Framework for Models
+
+## 📝 Bonus Issues
+### 24. [DOCUMENTATION] Update Readme.md after ACWOC issues are resolved
