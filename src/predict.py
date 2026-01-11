@@ -4,6 +4,10 @@ import os
 from src.model import SentimentLSTM
 from src.preprocessing import TextPreprocessor
 
+# Get the directory of the current script
+script_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(script_dir)
+
 class SentimentPredictor:
     def __init__(self, model_path: str, preprocessor_path: str):
         """Initialize the sentiment predictor with model and preprocessor"""
@@ -22,8 +26,8 @@ class SentimentPredictor:
         # Create model with same architecture as training
         self.model = SentimentLSTM(
             vocab_size=self.preprocessor.vocab_size,
-            embedding_dim=32,
-            hidden_dim=32,
+            embedding_dim=64,
+            hidden_dim=64,
             output_dim=1,
             num_layers=1,
             dropout=0.2,
@@ -77,10 +81,14 @@ class SentimentPredictor:
 # Global predictor instance
 _predictor = None
 
-def initialize_predictor(model_path: str = 'models/lstm_model.pth',
-                        preprocessor_path: str = 'models/preprocessor.pkl') -> None:
+def initialize_predictor(model_path: str = None,
+                        preprocessor_path: str = None) -> None:
     """Initialize the global predictor instance"""
     global _predictor
+    if model_path is None:
+        model_path = os.path.join(project_root, 'models', 'lstm_model.pth')
+    if preprocessor_path is None:
+        preprocessor_path = os.path.join(project_root, 'models', 'preprocessor.pkl')
     _predictor = SentimentPredictor(model_path, preprocessor_path)
 
 def predict_sentiment(text: str) -> dict:
