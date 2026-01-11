@@ -27,15 +27,19 @@
             <form id="sentimentForm">
                 <div class="form-group">
                     <label for="text">Enter your text:</label>
-                    <input 
-                        type="text" 
+                    <textarea 
                         id="text" 
                         name="text" 
                         required 
                         placeholder="Type something to analyze..."
                         autocomplete="off"
                         aria-label="Text input for sentiment analysis"
-                    >
+                        maxlength="1000"
+                        rows="4"
+                    ></textarea>
+                    <div class="character-counter">
+                        <span id="charCount">0</span>/1000 characters
+                    </div>
                 </div>
                 <button type="submit" aria-label="Analyze sentiment">
                     <span class="button-text">Analyze Sentiment</span>

@@ -1,3 +1,31 @@
+document.addEventListener("DOMContentLoaded", function() {
+    const textInput = document.getElementById("text");
+    const charCount = document.getElementById("charCount");
+    const charCounter = document.querySelector(".character-counter");
+    const maxLength = 1000;
+
+    // Update character count
+    function updateCharCount() {
+        const length = textInput.value.length;
+        charCount.textContent = length;
+        
+        // Update counter styling
+        charCounter.classList.remove("warning", "error");
+        if (length > maxLength * 0.9) {
+            charCounter.classList.add("warning");
+        }
+        if (length > maxLength) {
+            charCounter.classList.add("error");
+        }
+    }
+
+    // Add input event listener for character counting
+    textInput.addEventListener("input", updateCharCount);
+    
+    // Initialize character count
+    updateCharCount();
+});
+
 document.getElementById("sentimentForm").addEventListener("submit", async function(event) {
     event.preventDefault();  // Prevent form from reloading the page
 
@@ -6,6 +34,12 @@ document.getElementById("sentimentForm").addEventListener("submit", async functi
 
     if (!text) {
         showResponse("Error: Please enter some text!", true);
+        return;
+    }
+
+    // Check character limit
+    if (text.length > 1000) {
+        showResponse("Error: Text exceeds the maximum limit of 1000 characters. Please shorten your text.", true);
         return;
     }
 

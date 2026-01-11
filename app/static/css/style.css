@@ -112,7 +112,7 @@ label {
     font-size: 1.1rem;
 }
 
-input[type="text"] {
+input[type="text"], textarea {
     width: 100%;
     padding: 1rem;
     border: 2px solid #e1e1e1;
@@ -121,12 +121,28 @@ input[type="text"] {
     transition: var(--transition);
     font-family: inherit;
     background: rgba(255, 255, 255, 0.9);
+    resize: vertical;
 }
 
-input[type="text"]:focus {
+textarea:focus, input[type="text"]:focus {
     outline: none;
     border-color: var(--primary-color);
     box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+}
+
+.character-counter {
+    text-align: right;
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.character-counter.warning {
+    color: #f39c12;
+}
+
+.character-counter.error {
+    color: var(--error-color);
 }
 
 button {
