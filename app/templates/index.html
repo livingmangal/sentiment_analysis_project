@@ -1,22 +1,29 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Sentiment Analysis Web Application">
-    <meta name="theme-color" content="#4a90e2">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Sentiment Analysis Web Application" />
+    <meta name="theme-color" content="#4a90e2" />
     <title>Sentiment Analysis</title>
-    <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-</head>
-<body>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/style.css') }}"
+    />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
     <!-- Background image container -->
     <div class="background-container">
-        <div class="background-overlay"></div>
+      <div class="background-overlay"></div>
     </div>
-    
+
     <div class="container">
         <header>
             <h2>Sentiment Analysis</h2>
@@ -46,26 +53,50 @@
                     <span class="button-icon">🔍</span>
                 </button>
             </form>
+      <header>
+        <h2>Sentiment Analysis</h2>
+        <p class="subtitle">Analyze the sentiment of any text</p>
+      </header>
 
-            <div id="response" style="display: none;" role="alert" aria-live="polite"></div>
-        </main>
+      <main>
+        <form id="sentimentForm">
+          <div class="form-group">
+            <label for="text">Enter your text:</label>
+            <textarea
+              id="text"
+              name="text"
+              required
+              placeholder="Type something to analyze..."
+              autocomplete="off"
+              aria-label="Text input for sentiment analysis"
+              rows="4"
+            ></textarea>
+          </div>
+          <button type="submit" aria-label="Analyze sentiment">
+            <span class="button-text">Analyze Sentiment</span>
+            <span class="button-icon">🔍</span>
+          </button>
+        </form>
 
-        <footer>
-            <p>Built using Flask and PyTorch</p>
-            <p class="copyright">Copyright rights reserved to MS, 2024</p>
-        </footer>
+        <div
+          id="response"
+          style="display: none"
+          role="alert"
+          aria-live="polite"
+        ></div>
+      </main>
+
+      <footer>
+        <p>Built using Flask and PyTorch</p>
+        <p class="copyright">Copyright rights reserved to MS, 2024</p>
+      </footer>
     </div>
 
     <script>
-        // Get the current URL without the trailing slash
-        const baseUrl = window.location.origin;
-        console.log('Base URL:', baseUrl);
+      // Get the current URL without the trailing slash
+      const baseUrl = window.location.origin;
+      console.log("Base URL:", baseUrl);
     </script>
-    <script src="/static/js/script.js"></script>
-</body>
-</html> 
-
-
-<!-- old one
-<script src="{{ url_for('static', filename='js/script.js') }}"></script> 
-<script src="static/js/script.js"></script> --> 
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+  </body>
+</html>
