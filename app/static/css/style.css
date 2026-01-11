@@ -157,6 +157,15 @@ button:active {
     transform: translateY(0);
 }
 
+/* Disabled button state */
+button:disabled {
+    background-color: #95a5a6; /* Greyed out color */
+    cursor: not-allowed;       /* Shows 'prohibited' cursor */
+    opacity: 0.8;
+    transform: none;           /* Prevents the hover 'lift' effect */
+    box-shadow: none;
+}
+
 .button-icon {
     font-size: 1.2rem;
 }

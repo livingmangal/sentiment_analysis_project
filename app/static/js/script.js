@@ -93,17 +93,41 @@ function hideResponse() {
 }
 
 function showLoading(show) {
-	let loading = document.querySelector(".loading");
+    // --- 1. Existing Spinner Logic ---
+    let loading = document.querySelector(".loading");
 
-	if (!loading) {
-		loading = document.createElement("div");
-		loading.className = "loading";
-		loading.innerHTML = `
+    if (!loading) {
+        loading = document.createElement("div");
+        loading.className = "loading";
+        loading.innerHTML = `
             <div class="spinner"></div>
             <p>Analyzing sentiment...</p>
         `;
-		form.after(loading);
-	}
+        form.after(loading);
+    }
 
-	loading.style.display = show ? "block" : "none";
+    loading.style.display = show ? "block" : "none";
+
+    // --- 2. New Button Loading State Logic ---
+    
+    // Disable the button based on the 'show' flag
+    submitButton.disabled = show;
+
+    // Select the text and icon spans inside the button
+    const btnText = submitButton.querySelector(".button-text");
+    const btnIcon = submitButton.querySelector(".button-icon");
+
+    if (show) {
+        // Change text and icon to indicate loading
+        if (btnText) btnText.textContent = "Analyzing...";
+        if (btnIcon) btnIcon.textContent = "⏳";
+    } else {
+        // Restore original text and icon
+        if (btnText) btnText.textContent = "Analyze Sentiment";
+        if (btnIcon) btnIcon.textContent = "🔍";
+        
+        // IMPORTANT: Re-check input validity. 
+        // This ensures the button doesn't accidentally stay enabled if the text box is empty.
+        updateUIState();
+    }
 }
