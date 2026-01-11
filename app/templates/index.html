@@ -6,10 +6,8 @@
     <meta name="description" content="Sentiment Analysis Web Application" />
     <meta name="theme-color" content="#4a90e2" />
     <title>Sentiment Analysis</title>
-    <link
-      rel="stylesheet"
-      href="{{ url_for('static', filename='css/style.css') }}"
-    />
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=3" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -19,7 +17,6 @@
     />
   </head>
   <body>
-    <!-- Background image container -->
     <div class="background-container">
       <div class="background-overlay"></div>
     </div>
@@ -69,6 +66,7 @@
       const baseUrl = window.location.origin;
       console.log("Base URL:", baseUrl);
     </script>
-    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    
+    <script src="{{ url_for('static', filename='js/script.js') }}?v=3"></script>
   </body>
 </html>

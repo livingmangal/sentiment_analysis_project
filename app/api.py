@@ -5,6 +5,7 @@ import logging
 from typing import Dict, Any
 import os
 import json
+import time
 
 # Configure logging
 logging.basicConfig(
@@ -78,6 +79,8 @@ def predict() -> tuple[Dict[str, Any], int]:
     # Handle preflight request
     if request.method == 'OPTIONS':
         return jsonify({'status': 'ok'}), 200
+    
+    time.sleep(3)
         
     try:
         # Log the incoming request

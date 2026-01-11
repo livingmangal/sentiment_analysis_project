@@ -126,8 +126,8 @@ function showLoading(show) {
         if (btnText) btnText.textContent = "Analyze Sentiment";
         if (btnIcon) btnIcon.textContent = "🔍";
         
-        // IMPORTANT: Re-check input validity. 
-        // This ensures the button doesn't accidentally stay enabled if the text box is empty.
-        updateUIState();
+        // BUG FIX: Do NOT call updateUIState() here.
+        // Instead, manually check validity so we don't accidentally hide the result.
+        submitButton.disabled = !isValidInput(textInput.value);
     }
 }
