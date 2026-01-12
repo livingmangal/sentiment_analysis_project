@@ -4,6 +4,37 @@ logger.setLevel(
   window.location.hostname === "localhost" ? "debug" : "warn"
 );
 
+document.addEventListener("DOMContentLoaded", function () {
+  const textInput = document.getElementById("text");
+  const charCounter = document.getElementById("charCounter");
+  const maxLength = 500;
+
+  if (!textInput || !charCounter) return;
+
+  function updateCharCounter() {
+    const currentLength = textInput.value.length;
+    const remaining = maxLength - currentLength;
+
+    charCounter.textContent = `${currentLength} / ${maxLength} characters (${remaining} remaining)`;
+
+    charCounter.classList.remove("warning", "error");
+
+    if (remaining <= 50 && remaining > 0) {
+      charCounter.classList.add("warning");
+    }
+
+    if (remaining <= 0) {
+      charCounter.classList.add("error");
+    }
+  }
+
+ 
+  updateCharCounter();
+
+ 
+  textInput.addEventListener("input", updateCharCounter);
+});
+
 document
   .getElementById("sentimentForm")
   .addEventListener("submit", async function (event) {
