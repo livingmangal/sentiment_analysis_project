@@ -45,7 +45,11 @@
               autocomplete="off"
               aria-label="Text input for sentiment analysis"
               rows="4"
+              maxlength="500"
             ></textarea>
+            <div class="char-counter" id="charCounter" aria-live="polite">
+              0 / 500 characters
+            </div>
           </div>
           <button type="submit" aria-label="Analyze sentiment">
             <span class="button-text">Analyze Sentiment</span>
