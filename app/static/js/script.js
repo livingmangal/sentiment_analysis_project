@@ -1,151 +1,188 @@
-document.addEventListener("DOMContentLoaded", function() {
-    const textInput = document.getElementById("text");
-    const charCount = document.getElementById("charCount");
-    const charCounter = document.querySelector(".character-counter");
-    const maxLength = 1000;
+const logger = window.log;
 
-    // Update character count
-    function updateCharCount() {
-        const length = textInput.value.length;
-        charCount.textContent = length;
-        
-        // Update counter styling
-        charCounter.classList.remove("warning", "error");
-        if (length > maxLength * 0.9) {
-            charCounter.classList.add("warning");
-        }
-        if (length > maxLength) {
-            charCounter.classList.add("error");
-        }
+logger.setLevel(
+  window.location.hostname === "localhost" ? "debug" : "warn"
+);
+
+document.addEventListener("DOMContentLoaded", function () {
+  const textInput = document.getElementById("text");
+  const charCounter = document.getElementById("charCounter");
+  const maxLength = 500;
+
+  if (!textInput || !charCounter) return;
+
+  function updateCharCounter() {
+    const currentLength = textInput.value.length;
+    const remaining = maxLength - currentLength;
+
+    charCounter.textContent = `${currentLength} / ${maxLength} characters (${remaining} remaining)`;
+
+    charCounter.classList.remove("warning", "error");
+
+    if (remaining <= 50 && remaining > 0) {
+      charCounter.classList.add("warning");
     }
 
-    // Add input event listener for character counting
-    textInput.addEventListener("input", updateCharCount);
-    
-    // Initialize character count
-    updateCharCount();
+    if (remaining <= 0) {
+      charCounter.classList.add("error");
+    }
+  }
+
+ 
+  updateCharCounter();
+
+ 
+  textInput.addEventListener("input", updateCharCounter);
 });
 
-document.getElementById("sentimentForm").addEventListener("submit", async function(event) {
-    event.preventDefault();  // Prevent form from reloading the page
+document
+  .getElementById("sentimentForm")
+  .addEventListener("submit", async function (event) {
+    event.preventDefault(); // Prevent form from reloading the page
+
 
     const text = document.getElementById("text").value.trim();
     const responseElement = document.getElementById("response");
 
+
     if (!text) {
-        showResponse("Error: Please enter some text!", true);
-        return;
+      showResponse("Error: Please enter some text!", true);
+      return;
     }
 
-    // Check character limit
-    if (text.length > 1000) {
-        showResponse("Error: Text exceeds the maximum limit of 1000 characters. Please shorten your text.", true);
-        return;
-    }
 
-    // Show loading animation
     showLoading(true);
     hideResponse();
 
+
     try {
-        const url = `${baseUrl}/predict`;
-        console.log('Sending request to:', url);
-        console.log('Request data:', { text: text });
+      const url = `${baseUrl}/predict`;
 
-        // Use baseUrl for API calls
-        const response = await fetch(url, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            },
-            mode: "cors",
-            credentials: "omit",
-            body: JSON.stringify({ text: text })
-        });
 
-        console.log('Response status:', response.status);
-        console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-        
-        // Get the response text first
-        const responseText = await response.text();
-        console.log('Raw response:', responseText);
-        
-        let responseData;
-        try {
-            responseData = JSON.parse(responseText);
-            console.log('Parsed response data:', responseData);
-        } catch (e) {
-            console.error('Failed to parse JSON:', e);
-            console.error('Raw response that failed to parse:', responseText);
-            throw new Error('Invalid response from server');
-        }
+      logger.debug("Sending request to:", url);
+      logger.debug("Request payload:", { text });
 
-        if (!response.ok) {
-            throw new Error(responseData.error || `Server error: ${response.status}`);
-        }
-        
-        if (!responseData.sentiment || !responseData.confidence) {
-            console.error('Invalid response format:', responseData);
-            throw new Error('Invalid response format from server');
-        }
-        
-        // Create result HTML with emoji
-        const emoji = responseData.sentiment === 'Positive' ? '😊' : '😔';
-        const resultHTML = `
-            <div class="emoji">${emoji}</div>
-            <div class="result-content">
-                <h3>Analysis Result</h3>
-                <p>Sentiment: <strong>${responseData.sentiment}</strong></p>
-                <p>Confidence: <strong>${(responseData.confidence * 100).toFixed(1)}%</strong></p>
-            </div>
-        `;
-        
-        showResponse(resultHTML, false, responseData.sentiment === 'Positive');
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        mode: "cors",
+        credentials: "omit",
+        body: JSON.stringify({ text }),
+      });
+
+
+      logger.debug("Response status:", response.status);
+      logger.debug(
+        "Response headers:",
+        Object.fromEntries(response.headers.entries())
+      );
+
+
+      // Actually read the response text from the server
+      const responseText = await response.text();
+
+
+      logger.debug("Raw response:", responseText);
+
+
+      let responseData;
+      try {
+        responseData = JSON.parse(responseText);
+        logger.debug("Parsed response data:", responseData);
+      } catch (e) {
+        logger.error("Failed to parse JSON response", e);
+        logger.error("Invalid response body:", responseText);
+        throw new Error("Invalid response from server");
+      }
+
+
+      if (!response.ok) {
+        throw new Error(
+          responseData.error || `Server error: ${response.status}`
+        );
+      }
+
+
+      if (!responseData.sentiment || !responseData.confidence) {
+        logger.error("Unexpected response format:", responseData);
+        throw new Error("Invalid response format from server");
+      }
+
+
+      const emoji =
+        responseData.sentiment === "Positive" ? "😊" : "😔";
+
+
+      const resultHTML = `
+        <div class="emoji">${emoji}</div>
+        <div class="result-content">
+          <h3>Analysis Result</h3>
+          <p>Sentiment: <strong>${responseData.sentiment}</strong></p>
+          <p>Confidence: <strong>${
+            (responseData.confidence * 100).toFixed(1)
+          }%</strong></p>
+        </div>
+      `;
+
+
+      showResponse(
+        resultHTML,
+        false,
+        responseData.sentiment === "Positive"
+      );
     } catch (error) {
-        console.error('Error:', error);
-        showResponse(`Error: ${error.message}`, true);
+      logger.error("Sentiment analysis failed:", error);
+      showResponse(`Error: ${error.message}`, true);
     } finally {
-        showLoading(false);
+      showLoading(false);
     }
-});
+  });
 
+
+/* ---------- UI HELPERS ---------- */
 function showResponse(html, isError, isPositive = null) {
-    const responseElement = document.getElementById("response");
-    responseElement.innerHTML = html;
-    responseElement.className = "fade-in";
-    
-    if (isError) {
-        responseElement.classList.add("error");
-    } else if (isPositive !== null) {
-        responseElement.classList.add(isPositive ? "success" : "error");
-    }
-    
-    responseElement.style.display = "block";
-    responseElement.classList.add("show");
+  const responseElement = document.getElementById("response");
+  responseElement.innerHTML = html;
+  responseElement.className = "fade-in";
+
+
+  if (isError) {
+    responseElement.classList.add("error");
+  } else if (isPositive !== null) {
+    responseElement.classList.add(isPositive ? "success" : "error");
+  }
+
+
+  responseElement.style.display = "block";
+  responseElement.classList.add("show");
 }
+
 
 function hideResponse() {
-    const responseElement = document.getElementById("response");
-    responseElement.style.display = "none";
-    responseElement.className = "";
+  const responseElement = document.getElementById("response");
+  responseElement.style.display = "none";
+  responseElement.className = "";
 }
+
 
 function showLoading(show) {
-    const loadingElement = document.querySelector(".loading");
-    if (!loadingElement) {
-        // Create loading element if it doesn't exist
-        const loading = document.createElement("div");
-        loading.className = "loading";
-        loading.innerHTML = `
-            <div class="spinner"></div>
-            <p>Analyzing sentiment...</p>
-        `;
-        document.getElementById("sentimentForm").after(loading);
-    }
-    document.querySelector(".loading").style.display = show ? "block" : "none";
-}
+  let loadingElement = document.querySelector(".loading");
 
-// old one 
-// fetch("/predict", {
-//     fetch("http://127.0.0.1:5000/predict", {
+
+  if (!loadingElement) {
+    loadingElement = document.createElement("div");
+    loadingElement.className = "loading";
+    loadingElement.innerHTML = `
+      <div class="spinner"></div>
+      <p>Analyzing sentiment...</p>
+    `;
+    document.getElementById("sentimentForm").after(loadingElement);
+  }
+
+
+  loadingElement.style.display = show ? "block" : "none";
+}
