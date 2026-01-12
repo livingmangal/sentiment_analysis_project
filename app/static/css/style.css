@@ -112,6 +112,7 @@ label {
     font-size: 1.1rem;
 }
 
+input[type="text"], textarea {
 textarea {
     width: 100%;
     padding: 1rem;
@@ -121,6 +122,10 @@ textarea {
     transition: var(--transition);
     font-family: inherit;
     background: rgba(255, 255, 255, 0.9);
+    resize: vertical;
+}
+
+textarea:focus, input[type="text"]:focus {
     resize: vertical; 
     min-height: 120px;
 }
@@ -131,6 +136,20 @@ textarea:focus {
     box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
 }
 
+.character-counter {
+    text-align: right;
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.character-counter.warning {
+    color: #f39c12;
+}
+
+.character-counter.error {
+    color: var(--error-color);
+}
 
 button {
     width: 100%;

@@ -105,6 +105,11 @@ def predict() -> tuple[Dict[str, Any], int]:
             logger.error("Invalid text input")
             return jsonify({'error': 'Text must be a non-empty string'}), 400
         
+        # Check text length limit
+        if len(text) > 1000:
+            logger.error(f"Text length exceeds limit: {len(text)} characters")
+            return jsonify({'error': 'Text exceeds the maximum limit of 1000 characters'}), 400
+        
         # Get prediction
         try:
             result = predict_sentiment(text)

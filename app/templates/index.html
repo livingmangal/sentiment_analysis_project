@@ -25,6 +25,34 @@
     </div>
 
     <div class="container">
+        <header>
+            <h2>Sentiment Analysis</h2>
+            <p class="subtitle">Analyze the sentiment of any text</p>
+        </header>
+        
+        <main>
+            <form id="sentimentForm">
+                <div class="form-group">
+                    <label for="text">Enter your text:</label>
+                    <textarea 
+                        id="text" 
+                        name="text" 
+                        required 
+                        placeholder="Type something to analyze..."
+                        autocomplete="off"
+                        aria-label="Text input for sentiment analysis"
+                        maxlength="1000"
+                        rows="4"
+                    ></textarea>
+                    <div class="character-counter">
+                        <span id="charCount">0</span>/1000 characters
+                    </div>
+                </div>
+                <button type="submit" aria-label="Analyze sentiment">
+                    <span class="button-text">Analyze Sentiment</span>
+                    <span class="button-icon">🔍</span>
+                </button>
+            </form>
       <header>
         <h2>Sentiment Analysis</h2>
         <p class="subtitle">Analyze the sentiment of any text</p>
