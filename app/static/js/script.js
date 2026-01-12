@@ -1,16 +1,8 @@
 const logger = window.log;
 
-
-
-
 logger.setLevel(
   window.location.hostname === "localhost" ? "debug" : "warn"
 );
-
-
-
-
-
 
 document
   .getElementById("sentimentForm")
@@ -120,6 +112,7 @@ document
   });
 
 
+/* ---------- UI HELPERS ---------- */
 function showResponse(html, isError, isPositive = null) {
   const responseElement = document.getElementById("response");
   responseElement.innerHTML = html;
