@@ -5,6 +5,7 @@ import logging
 from typing import Dict, Any
 import os
 import json
+import time
 
 # Configure logging
 logging.basicConfig(
@@ -13,12 +14,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Get the directory where this file is located (app/)
+basedir = os.path.abspath(os.path.dirname(__file__))
+
 # Get static URL path from environment or default to /static
 static_url_path = os.environ.get('STATIC_URL_PATH', '/static')
 
+# Use absolute paths to ensure Flask finds static and template folders
 app = Flask(__name__, 
-    template_folder='templates',
-    static_folder='static',
+    template_folder=os.path.join(basedir, 'templates'),
+    static_folder=os.path.join(basedir, 'static'),
     static_url_path=static_url_path
 )
 
@@ -74,6 +79,8 @@ def predict() -> tuple[Dict[str, Any], int]:
     # Handle preflight request
     if request.method == 'OPTIONS':
         return jsonify({'status': 'ok'}), 200
+    
+    time.sleep(3)
         
     try:
         # Log the incoming request
@@ -100,6 +107,11 @@ def predict() -> tuple[Dict[str, Any], int]:
         if not isinstance(text, str) or not text.strip():
             logger.error("Invalid text input")
             return jsonify({'error': 'Text must be a non-empty string'}), 400
+        
+        # Check text length limit
+        if len(text) > 1000:
+            logger.error(f"Text length exceeds limit: {len(text)} characters")
+            return jsonify({'error': 'Text exceeds the maximum limit of 1000 characters'}), 400
         
         # Get prediction
         try:

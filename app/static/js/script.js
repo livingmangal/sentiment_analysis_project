@@ -143,6 +143,7 @@ document
   });
 
 
+/* ---------- UI HELPERS ---------- */
 function showResponse(html, isError, isPositive = null) {
   const responseElement = document.getElementById("response");
   responseElement.innerHTML = html;
