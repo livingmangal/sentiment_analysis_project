@@ -7,6 +7,7 @@ logger.setLevel(
 document.addEventListener("DOMContentLoaded", function () {
   const textInput = document.getElementById("text");
   const charCounter = document.getElementById("charCounter");
+  const clearButton = document.getElementById("clearButton");
   const maxLength = 500;
 
   if (!textInput || !charCounter) return;
@@ -28,11 +29,36 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
- 
-  updateCharCounter();
+  function toggleClearButton() {
+    if (clearButton) {
+      if (textInput.value.trim().length > 0) {
+        clearButton.classList.add("show");
+      } else {
+        clearButton.classList.remove("show");
+      }
+    }
+  }
 
- 
-  textInput.addEventListener("input", updateCharCounter);
+  function clearInput() {
+    textInput.value = "";
+    textInput.focus();
+    updateCharCounter();
+    toggleClearButton();
+  }
+
+  // Initialize
+  updateCharCounter();
+  toggleClearButton();
+
+  // Event listeners
+  textInput.addEventListener("input", function () {
+    updateCharCounter();
+    toggleClearButton();
+  });
+
+  if (clearButton) {
+    clearButton.addEventListener("click", clearInput);
+  }
 });
 
 document

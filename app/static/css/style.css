@@ -104,6 +104,11 @@ h2 {
     margin-bottom: 1.5rem;
 }
 
+.input-wrapper {
+    position: relative;
+    width: 100%;
+}
+
 label {
     display: block;
     margin-bottom: 0.5rem;
@@ -128,6 +133,7 @@ textarea {
     width: 100%;
     min-height: 120px;
     padding: 1rem;
+    padding-right: 2.5rem;
     border: 2px solid #e1e1e1;
     border-radius: 6px;
     font-size: 1rem;
@@ -340,4 +346,41 @@ footer p:last-child {
 .char-counter.error {
     color: var(--error-color);
     font-weight: 600;
+}
+
+/* Clear Button */
+.clear-button {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    background: rgba(0, 0, 0, 0.1);
+    color: #666;
+    border: none;
+    border-radius: 50%;
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
+    z-index: 10;
+    font-weight: 300;
+}
+
+.clear-button.show {
+    display: flex;
+}
+
+.clear-button:hover {
+    background: rgba(0, 0, 0, 0.2);
+    color: var(--error-color);
+    transform: scale(1.1);
+}
+
+.clear-button:active {
+    transform: scale(0.95);
 }
