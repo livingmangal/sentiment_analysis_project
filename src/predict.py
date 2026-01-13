@@ -1,6 +1,7 @@
 import torch
 from typing import Dict, Any
 import os
+import json
 from src.model import SentimentLSTM
 from src.preprocessing import TextPreprocessor
 
@@ -9,8 +10,8 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(script_dir)
 
 class SentimentPredictor:
-    def __init__(self, model_path: str, preprocessor_path: str):
-        """Initialize the sentiment predictor with model and preprocessor"""
+    def __init__(self, model_path: str, preprocessor_path: str, metadata_path: str = None): 
+        """Initialize the sentiment predictor with model, preprocessor, and metadata"""
         # Ensure paths are absolute
         model_path = os.path.abspath(model_path)
         preprocessor_path = os.path.abspath(preprocessor_path)
@@ -20,6 +21,15 @@ class SentimentPredictor:
         if not os.path.exists(preprocessor_path):
             raise FileNotFoundError(f"Preprocessor file not found at {preprocessor_path}")
         
+        # Load Metadata (New Section)
+        self.metadata = {"version": "unknown", "training_date": "unknown"}
+        if metadata_path and os.path.exists(metadata_path):
+            try:
+                with open(metadata_path, 'r') as f:
+                    self.metadata = json.load(f)
+            except Exception as e:
+                print(f"Warning: Could not load metadata: {e}")
+
         # Load preprocessor
         self.preprocessor = TextPreprocessor.load(preprocessor_path)
         
@@ -45,18 +55,7 @@ class SentimentPredictor:
         self.model = self.model.to(self.device)
     
     def predict(self, text: str) -> dict:
-        """
-        Predict sentiment for given text
-        
-        Args:
-            text: Input text to analyze
-            
-        Returns:
-            Dictionary containing:
-                - sentiment: "Positive" or "Negative"
-                - confidence: float between 0 and 1
-                - raw_score: raw model output
-        """
+        """Predict sentiment and include model metadata"""
         # Preprocess text
         text_tensor = self.preprocessor.transform(text)
         
@@ -75,45 +74,41 @@ class SentimentPredictor:
         return {
             "sentiment": sentiment,
             "confidence": round(confidence, 4),
-            "raw_score": round(output.item(), 4)
+            "raw_score": round(output.item(), 4),
+            "model_info": self.metadata 
         }
 
 # Global predictor instance
 _predictor = None
 
 def initialize_predictor(model_path: str = None,
-                        preprocessor_path: str = None) -> None:
+                         preprocessor_path: str = None,
+                         metadata_path: str = None) -> None: 
     """Initialize the global predictor instance"""
     global _predictor
+    
+    # Set defaults if not provided
     if model_path is None:
         model_path = os.path.join(project_root, 'models', 'lstm_model.pth')
     if preprocessor_path is None:
         preprocessor_path = os.path.join(project_root, 'models', 'preprocessor.pkl')
-    _predictor = SentimentPredictor(model_path, preprocessor_path)
+    if metadata_path is None:
+        metadata_path = os.path.join(project_root, 'models', 'metadata.json')
+        
+    _predictor = SentimentPredictor(model_path, preprocessor_path, metadata_path)
 
 def predict_sentiment(text: str) -> dict:
-    """
-    Predict sentiment for given text using the global predictor instance
-    
-    Args:
-        text: Input text to analyze
-        
-    Returns:
-        Dictionary containing sentiment prediction and confidence
-    """
+    """Wrapper for global predictor"""
     global _predictor
     if _predictor is None:
         raise RuntimeError("Predictor not initialized. Call initialize_predictor() first.")
     return _predictor.predict(text)
 
 if __name__ == "__main__":
-    # Example usage
     try:
         initialize_predictor()
         test_text = "This movie was fantastic!"
         result = predict_sentiment(test_text)
-        print(f'Text: {test_text}')
-        print(f'Predicted Sentiment: {result["sentiment"]}')
-        print(f'Confidence: {result["confidence"]}')
+        print(json.dumps(result, indent=2)) # Pretty print to verify metadata
     except Exception as e:
         print(f"Error: {str(e)}")
