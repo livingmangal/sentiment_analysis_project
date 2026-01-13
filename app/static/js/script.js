@@ -59,6 +59,24 @@ document.addEventListener("DOMContentLoaded", function () {
   if (clearButton) {
     clearButton.addEventListener("click", clearInput);
   }
+
+  // Keyboard shortcuts
+  textInput.addEventListener("keydown", function (event) {
+    // Ctrl+Enter or Cmd+Enter (Mac) to submit
+    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+      event.preventDefault();
+      const form = document.getElementById("sentimentForm");
+      if (form) {
+        form.dispatchEvent(new Event("submit"));
+      }
+    }
+
+    // Esc to clear input
+    if (event.key === "Escape") {
+      event.preventDefault();
+      clearInput();
+    }
+  });
 });
 
 document

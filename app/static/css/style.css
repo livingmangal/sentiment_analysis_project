@@ -384,3 +384,32 @@ footer p:last-child {
 .clear-button:active {
     transform: scale(0.95);
 }
+
+/* Keyboard Hint */
+.keyboard-hint {
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+    color: #888;
+    text-align: left;
+}
+
+.hint-text {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex-wrap: wrap;
+}
+
+kbd {
+    display: inline-block;
+    padding: 0.2rem 0.4rem;
+    font-size: 0.75rem;
+    font-family: 'Inter', 'Segoe UI', monospace;
+    line-height: 1;
+    color: #555;
+    background-color: #f7f7f7;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2), inset 0 0 0 2px #fff;
+    font-weight: 500;
+}
