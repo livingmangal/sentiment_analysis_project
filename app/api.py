@@ -73,7 +73,12 @@ def predict() -> tuple[Dict[str, Any], int]:
     {
         "sentiment": "Positive" or "Negative",
         "confidence": float between 0 and 1,
-        "raw_score": raw model output
+        "raw_score": raw model output,
+        "model_info": {                    <--- Added documentation for new field
+            "model_version": "v1.0.0",
+            "training_date": "2026-01-13",
+            ...
+        }
     }
     """
     # Handle preflight request
