@@ -44,18 +44,31 @@
         <form id="sentimentForm">
           <div class="form-group">
             <label for="text">Enter your text:</label>
-            <textarea
-              id="text"
-              name="text"
-              required
-              placeholder="Type something to analyze..."
-              autocomplete="off"
-              aria-label="Text input for sentiment analysis"
-              rows="4"
-              maxlength="500"
-            ></textarea>
+            <div class="input-wrapper">
+              <textarea
+                id="text"
+                name="text"
+                required
+                placeholder="Type something to analyze..."
+                autocomplete="off"
+                aria-label="Text input for sentiment analysis"
+                rows="4"
+                maxlength="500"
+              ></textarea>
+              <button
+                type="button"
+                class="clear-button"
+                id="clearButton"
+                aria-label="Clear text"
+              >
+                ×
+              </button>
+            </div>
             <div class="char-counter" id="charCounter" aria-live="polite">
               0 / 500 characters
+            </div>
+            <div class="keyboard-hint">
+              <span class="hint-text">💡 Tip: Press <kbd>Ctrl+Enter</kbd> to submit, <kbd>Esc</kbd> to clear</span>
             </div>
           </div>
           <button type="submit" aria-label="Analyze sentiment">
