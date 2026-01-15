@@ -1,13 +1,23 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, Response
 from flask_cors import CORS
 from src.predict import initialize_predictor, predict_sentiment
-from src.database import init_db, get_db_session, Prediction
+from src.database import (
+    init_db,
+    get_db_session,
+    Prediction,
+    save_prediction,
+    get_all_predictions,
+    clear_all_predictions
+)
+from src.analytics import get_sentiment_trends, get_sentiment_summary
 import logging
 from typing import Dict, Any
 import os
 import json
 import time
 import uuid
+import csv
+import io
 
 # Configure logging
 logging.basicConfig(
@@ -40,14 +50,14 @@ CORS(app,
          }
      })
 
-# Initialize the predictor
+# Initialize the database and predictor
 try:
+    init_db()
+    logger.info("Database initialized successfully")
     initialize_predictor()
     logger.info("Sentiment predictor initialized successfully")
 except Exception as e:
-    logger.error(f"Failed to initialize predictor: {str(e)}")
-    # In production, you might not want to raise here to keep the server alive
-    # raise 
+    logger.error(f"Initialization error: {str(e)}")
 
 # Initialize the database
 try:
@@ -82,33 +92,25 @@ def home() -> str:
     """Serve the main page"""
     return render_template('index.html')
 
-# --- REMOVED THE CUSTOM STATIC ROUTE HERE ---
-# Flask handles /static/ automatically because we defined static_folder above.
-
 @app.route('/predict', methods=['POST', 'OPTIONS'])
 def predict() -> tuple[Dict[str, Any], int]:
     # Handle preflight request
     if request.method == 'OPTIONS':
         return jsonify({'status': 'ok'}), 200
     
-    time.sleep(3) # Simulating delay
+    # Reduced delay for better UX
+    time.sleep(1) 
         
     try:
-        request_data = request.get_data()
-        logger.info(f"Received request: {request_data}")
-        
         if not request.is_json:
             return jsonify({'error': 'Content-Type must be application/json'}), 400
         
-        try:
-            data = request.get_json()
-        except json.JSONDecodeError as e:
-            return jsonify({'error': 'Invalid JSON in request body'}), 400
-            
+        data = request.get_json()
         if not data or 'text' not in data:
             return jsonify({'error': 'Missing "text" field in request'}), 400
         
         text = data['text']
+        timestamp = data.get('timestamp') # Get timestamp from client
         if not isinstance(text, str) or not text.strip():
             return jsonify({'error': 'Text must be a non-empty string'}), 400
         
@@ -118,7 +120,6 @@ def predict() -> tuple[Dict[str, Any], int]:
         try:
             result = predict_sentiment(text)
             
-            # Ensure result is JSON serializable
             if not isinstance(result, dict):
                 result = {'error': 'Invalid prediction result format'}
                 return jsonify(result), 500
@@ -149,6 +150,14 @@ def predict() -> tuple[Dict[str, Any], int]:
             response_data['session_id'] = session_id
             response_data['prediction_id'] = prediction_id
                 return jsonify({'error': 'Invalid prediction result format'}), 500
+            
+            # Save to database with client timestamp if provided
+            save_prediction(
+                text=text,
+                sentiment=result.get('sentiment', 'unknown'),
+                confidence=result.get('confidence', 0.0),
+                timestamp=timestamp
+            )
                 
             return jsonify(response_data), 200
             
@@ -160,108 +169,113 @@ def predict() -> tuple[Dict[str, Any], int]:
         logger.error(f"Error processing request: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-
 @app.route('/history', methods=['GET', 'OPTIONS'])
 def get_history() -> tuple[Dict[str, Any], int]:
-    """
-    Get prediction history for the current session
-    
-    Returns:
-    {
-        "predictions": [
-            {
-                "id": int,
-                "input_data": {...},
-                "prediction_result": {...},
-                "is_favorite": bool,
-                "timestamp": "ISO datetime string",
-                "session_id": "string"
-            },
-            ...
-        ]
-    }
-    """
-    # Handle preflight request
     if request.method == 'OPTIONS':
         return jsonify({'status': 'ok'}), 200
-    
+
     try:
         session_id = get_session_id()
         logger.info(f"Fetching history for session: {session_id}")
-        
+
         db_session = get_db_session(db_engine)
-        
-        # Get predictions for this session, ordered by timestamp descending
+
         predictions = db_session.query(Prediction).filter(
             Prediction.session_id == session_id
         ).order_by(Prediction.timestamp.desc()).all()
-        
-        # Convert to dictionaries
+
         predictions_list = [pred.to_dict() for pred in predictions]
-        
         db_session.close()
-        
-        logger.info(f"Found {len(predictions_list)} predictions for session {session_id}")
-        
+
         return jsonify({
             'predictions': predictions_list,
             'session_id': session_id
         }), 200
-        
+
     except Exception as e:
         logger.error(f"Error fetching history: {str(e)}")
-        return jsonify({'error': f'Failed to fetch history: {str(e)}'}), 500
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/favorite/<int:prediction_id>', methods=['POST', 'OPTIONS'])
 def toggle_favorite(prediction_id: int) -> tuple[Dict[str, Any], int]:
-    """
-    Toggle the favorite status of a prediction
-    
-    Returns:
-    {
-        "id": int,
-        "is_favorite": bool,
-        "message": "string"
-    }
-    """
-    # Handle preflight request
     if request.method == 'OPTIONS':
         return jsonify({'status': 'ok'}), 200
-    
+
     try:
         session_id = get_session_id()
-        logger.info(f"Toggling favorite for prediction {prediction_id} in session {session_id}")
-        
         db_session = get_db_session(db_engine)
-        
-        # Find the prediction
+
         prediction = db_session.query(Prediction).filter(
             Prediction.id == prediction_id,
             Prediction.session_id == session_id
         ).first()
-        
+
         if not prediction:
             db_session.close()
             return jsonify({'error': 'Prediction not found'}), 404
-        
-        # Toggle favorite status
+
         prediction.is_favorite = not prediction.is_favorite
         db_session.commit()
-        
         is_favorite = prediction.is_favorite
         db_session.close()
-        
-        logger.info(f"Prediction {prediction_id} favorite status set to {is_favorite}")
-        
+
         return jsonify({
             'id': prediction_id,
             'is_favorite': is_favorite,
             'message': 'Favorite status updated successfully'
         }), 200
-        
+
     except Exception as e:
         logger.error(f"Error toggling favorite: {str(e)}")
-        return jsonify({'error': f'Failed to update favorite status: {str(e)}'}), 500
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/analytics', methods=['GET'])
+def analytics():
+    try:
+        trends = get_sentiment_trends()
+        summary = get_sentiment_summary()
+        return jsonify({
+            'trends': trends,
+            'summary': summary
+        }), 200
+    except Exception as e:
+        logger.error(f"Analytics error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/export', methods=['GET'])
+def export_data():
+    try:
+        predictions = get_all_predictions()
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+
+        if predictions:
+            writer.writerow(predictions[0].keys())
+            for pred in predictions:
+                writer.writerow(pred.values())
+
+        return Response(
+            output.getvalue(),
+            mimetype="text/csv",
+            headers={"Content-disposition": "attachment; filename=sentiment_history.csv"}
+        )
+    except Exception as e:
+        logger.error(f"Export error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/clear-history', methods=['POST'])
+def clear_history():
+    try:
+        clear_all_predictions()
+        return jsonify({'status': 'success', 'message': 'History cleared'}), 200
+    except Exception as e:
+        logger.error(f"Clear history error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     app.run(debug=True)
