@@ -16,7 +16,174 @@ document.addEventListener("DOMContentLoaded", function () {
     const clearButton = document.getElementById("clearButton");
     const submitBtn = document.getElementById("submitBtn");
     const resultSection = document.getElementById("resultSection");
+    const exportBtn = document.getElementById("exportBtn");
+    const clearHistoryBtn = document.getElementById("clearHistoryBtn");
     const maxLength = 500;
+    let sentimentChart = null;
+
+    // --- CHART LOGIC ---
+    function initChart(data) {
+        const ctx = document.getElementById('sentimentChart').getContext('2d');
+        
+        const chartData = {
+            datasets: [{
+                label: 'Sentiment Trend',
+                data: data.map(item => ({
+                    x: new Date(item.timestamp),
+                    y: item.sentiment === 'positive' ? 1 : 0
+                })),
+                borderColor: '#6366f1',
+                backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                borderWidth: 3,
+                tension: 0.3,
+                pointBackgroundColor: (context) => {
+                    const index = context.dataIndex;
+                    const value = context.dataset.data[index];
+                    return value && value.y === 1 ? '#10b981' : '#ef4444';
+                },
+                pointRadius: 6,
+                fill: true
+            }]
+        };
+
+        const config = {
+            type: 'line',
+            data: chartData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            tooltipFormat: 'yyyy-MM-dd HH:mm:ss',
+                            displayFormats: {
+                                second: 'HH:mm:ss',
+                                minute: 'HH:mm',
+                                hour: 'HH:mm'
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: 'Time'
+                        }
+                    },
+                    y: {
+                        min: -0.5,
+                        max: 1.5,
+                        ticks: {
+                            stepSize: 0.5,
+                            callback: function(value) {
+                                if (value === 1) return 'Positive';
+                                if (value === 0) return 'Negative';
+                                return '';
+                            },
+                            font: {
+                                size: 13,
+                                weight: '700'
+                            },
+                            color: '#1e293b'
+                        },
+                        title: {
+                            display: true,
+                            text: 'Sentiment',
+                            font: {
+                                weight: 'bold'
+                            }
+                        },
+                        grid: {
+                            display: true,
+                            drawBorder: true,
+                            color: 'rgba(0,0,0,0.1)'
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const val = context.parsed.y;
+                                const sentiment = val === 1 ? 'Positive' : 'Negative';
+                                const item = data[context.dataIndex];
+                                return `Sentiment: ${sentiment} | Text: ${item.text}`;
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        if (sentimentChart) {
+            sentimentChart.destroy();
+        }
+        sentimentChart = new Chart(ctx, config);
+    }
+
+    async function fetchAnalytics() {
+        try {
+            const response = await fetch('/analytics');
+            const data = await response.json();
+            
+            // Sync with LocalStorage
+            if (data.trends) {
+                localStorage.setItem('sentiment_history', JSON.stringify(data.trends));
+            }
+
+            if (data.trends && data.trends.length > 0) {
+                initChart(data.trends);
+            } else {
+                if (sentimentChart) {
+                    sentimentChart.destroy();
+                    sentimentChart = null;
+                }
+            }
+        } catch (error) {
+            logger.error("Failed to fetch analytics:", error);
+            // Fallback to LocalStorage if offline/error
+            const localData = localStorage.getItem('sentiment_history');
+            if (localData) {
+                initChart(JSON.parse(localData));
+            }
+        }
+    }
+
+    // Export Logic
+    if (exportBtn) {
+        exportBtn.addEventListener("click", () => {
+            window.location.href = '/export';
+        });
+    }
+
+    // Clear History Logic
+    if (clearHistoryBtn) {
+        clearHistoryBtn.addEventListener("click", async () => {
+            if (confirm("Are you sure you want to clear all history? This will delete data from both the server and your browser.")) {
+                try {
+                    const response = await fetch('/clear-history', { method: 'POST' });
+                    if (response.ok) {
+                        localStorage.removeItem('sentiment_history');
+                        fetchAnalytics();
+                    }
+                } catch (error) {
+                    logger.error("Failed to clear history:", error);
+                }
+            }
+        });
+    }
+
+    // Initial Fetch
+    const localData = localStorage.getItem('sentiment_history');
+    if (localData) {
+        try {
+            const parsedData = JSON.parse(localData);
+            if (parsedData.length > 0) {
+                initChart(parsedData);
+            }
+        } catch (e) {
+            logger.error("Error parsing local history:", e);
+        }
+    }
+    fetchAnalytics();
 
     // 1. Character Counter & Clear Button Logic
     function updateUI() {
@@ -76,13 +243,14 @@ document.addEventListener("DOMContentLoaded", function () {
 
         try {
             const url = `/predict`; 
+            const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' '); // Real-time local timestamp
             
             logger.debug("Sending request to:", url);
 
             const response = await fetch(url, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ text }),
+                body: JSON.stringify({ text, timestamp }),
             });
 
             const data = await response.json();
@@ -92,6 +260,22 @@ document.addEventListener("DOMContentLoaded", function () {
 
             // --- STATE: SUCCESS ---
             showResult(data);
+            
+            // Immediately update local storage and chart for real-time feel
+            const newRecord = {
+                timestamp: timestamp,
+                sentiment: data.sentiment.toLowerCase(),
+                text: text.length > 50 ? text.slice(0, 50) + '...' : text
+            };
+            
+            let history = JSON.parse(localStorage.getItem('sentiment_history') || '[]');
+            history.push(newRecord);
+            localStorage.setItem('sentiment_history', JSON.stringify(history));
+            
+            initChart(history);
+            
+            // Still sync with server to ensure consistency
+            fetchAnalytics();
 
         } catch (error) {
             logger.error("Analysis failed:", error);
