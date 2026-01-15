@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template, send_from_directory
+from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from src.predict import initialize_predictor, predict_sentiment
 from src.database import init_db, get_db_session, Prediction
@@ -16,20 +16,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Get the directory where this file is located (app/)
+# Get the directory where this file is located
 basedir = os.path.abspath(os.path.dirname(__file__))
 
-# Get static URL path from environment or default to /static
-static_url_path = os.environ.get('STATIC_URL_PATH', '/static')
-
-# Use absolute paths to ensure Flask finds static and template folders
+# Initialize Flask
+# Flask will automatically serve files from the 'static' folder found at 'basedir/static'
 app = Flask(__name__, 
     template_folder=os.path.join(basedir, 'templates'),
-    static_folder=os.path.join(basedir, 'static'),
-    static_url_path=static_url_path
+    static_folder=os.path.join(basedir, 'static')
 )
 
-# Configure app
+# Disable caching for static files (helps during development)
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 
@@ -49,7 +46,8 @@ try:
     logger.info("Sentiment predictor initialized successfully")
 except Exception as e:
     logger.error(f"Failed to initialize predictor: {str(e)}")
-    raise
+    # In production, you might not want to raise here to keep the server alive
+    # raise 
 
 # Initialize the database
 try:
@@ -84,75 +82,41 @@ def home() -> str:
     """Serve the main page"""
     return render_template('index.html')
 
-@app.route('/static/<path:filename>')
-def serve_static(filename):
-    """Serve static files"""
-    return send_from_directory(app.static_folder, filename)
+# --- REMOVED THE CUSTOM STATIC ROUTE HERE ---
+# Flask handles /static/ automatically because we defined static_folder above.
 
 @app.route('/predict', methods=['POST', 'OPTIONS'])
 def predict() -> tuple[Dict[str, Any], int]:
-    """
-    Predict sentiment for given text
-    
-    Request body:
-    {
-        "text": "Text to analyze"
-    }
-    
-    Returns:
-    {
-        "sentiment": "Positive" or "Negative",
-        "confidence": float between 0 and 1,
-        "raw_score": raw model output,
-        "model_info": {                    <--- Added documentation for new field
-            "model_version": "v1.0.0",
-            "training_date": "2026-01-13",
-            ...
-        }
-    }
-    """
     # Handle preflight request
     if request.method == 'OPTIONS':
         return jsonify({'status': 'ok'}), 200
     
-    time.sleep(3)
+    time.sleep(3) # Simulating delay
         
     try:
-        # Log the incoming request
         request_data = request.get_data()
         logger.info(f"Received request: {request_data}")
         
-        # Validate request
         if not request.is_json:
-            logger.error("Request is not JSON")
             return jsonify({'error': 'Content-Type must be application/json'}), 400
         
         try:
             data = request.get_json()
-            logger.info(f"Parsed JSON data: {data}")
         except json.JSONDecodeError as e:
-            logger.error(f"JSON decode error: {str(e)}")
             return jsonify({'error': 'Invalid JSON in request body'}), 400
             
         if not data or 'text' not in data:
-            logger.error("Missing text field in request")
             return jsonify({'error': 'Missing "text" field in request'}), 400
         
         text = data['text']
         if not isinstance(text, str) or not text.strip():
-            logger.error("Invalid text input")
             return jsonify({'error': 'Text must be a non-empty string'}), 400
         
-        # Check text length limit
         if len(text) > 1000:
-            logger.error(f"Text length exceeds limit: {len(text)} characters")
             return jsonify({'error': 'Text exceeds the maximum limit of 1000 characters'}), 400
         
-        # Get prediction
         try:
             result = predict_sentiment(text)
-            logger.info(f"Predicted sentiment for text: {text[:50]}...")
-            logger.info(f"Prediction result: {result}")
             
             # Ensure result is JSON serializable
             if not isinstance(result, dict):
@@ -184,6 +148,7 @@ def predict() -> tuple[Dict[str, Any], int]:
             response_data = result.copy()
             response_data['session_id'] = session_id
             response_data['prediction_id'] = prediction_id
+                return jsonify({'error': 'Invalid prediction result format'}), 500
                 
             return jsonify(response_data), 200
             
@@ -298,3 +263,5 @@ def toggle_favorite(prediction_id: int) -> tuple[Dict[str, Any], int]:
     except Exception as e:
         logger.error(f"Error toggling favorite: {str(e)}")
         return jsonify({'error': f'Failed to update favorite status: {str(e)}'}), 500
+if __name__ == '__main__':
+    app.run(debug=True)
