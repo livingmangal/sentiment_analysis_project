@@ -3,105 +3,75 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Sentiment Analysis Web Application" />
-    <meta name="theme-color" content="#4a90e2" />
     <title>Sentiment Analysis</title>
-    <link rel="icon" href="{{ url_for('static', filename='images/favicon.ico') }}" type="image/x-icon">
-    <link rel="stylesheet" href="/static/css/style.css">
+    
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-</head>
-<body>
-    <link
-      rel="stylesheet"
-      href="{{ url_for('static', filename='css/style.css') }}"
-    />
-
-
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
-      rel="stylesheet"
-    />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   </head>
+  
   <body>
-    <!-- Background image container -->
-    <div class="background-container">
-      <div class="background-overlay"></div>
-    </div>
+    <div class="bg-shape shape-1"></div>
+    <div class="bg-shape shape-2"></div>
 
-
-    <div class="container">
+    <div class="app-wrapper">
       <header>
-        <h2>Sentiment Analysis</h2>
-        <p class="subtitle">Analyze the sentiment of any text</p>
+        <div class="logo-area">
+          <h1>Sentiment<span class="highlight"> Analysis</span></h1>
+        </div>
+        <p class="subtitle">Advanced Text Emotion Detection</p>
       </header>
 
-
-      <main>
-        <form id="sentimentForm">
-          <div class="form-group">
-            <label for="text">Enter your text:</label>
-            <div class="input-wrapper">
+      <main class="glass-card">
+        
+        <section class="input-section">
+          <form id="sentimentForm">
+            <div class="form-header">
+              <label for="text">Analysis Input</label>
+              <div class="char-counter" id="charCounter">0 / 500</div>
+            </div>
+            
+            <div class="input-container">
               <textarea
                 id="text"
                 name="text"
                 required
-                placeholder="Type something to analyze..."
-                autocomplete="off"
-                aria-label="Text input for sentiment analysis"
-                rows="4"
+                placeholder="Paste your text here to analyze emotions..."
                 maxlength="500"
               ></textarea>
-              <button
-                type="button"
-                class="clear-button"
-                id="clearButton"
-                aria-label="Clear text"
-              >
-                ×
+              <button type="button" class="clear-btn" id="clearButton" title="Clear">×</button>
+            </div>
+
+            <div class="action-area">
+              <p class="hint">Hit <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to analyze</p>
+              <button type="submit" id="submitBtn">
+                <span>Analyze Text</span>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
               </button>
             </div>
-            <div class="char-counter" id="charCounter" aria-live="polite">
-              0 / 500 characters
-            </div>
-            <div class="keyboard-hint">
-              <span class="hint-text">💡 Tip: Press <kbd>Ctrl+Enter</kbd> to submit, <kbd>Esc</kbd> to clear</span>
-            </div>
+          </form>
+        </section>
+
+        <section class="result-section" id="resultSection">
+          <div class="placeholder-content">
+            <div class="pulse-circle">🔍</div>
+            <h3>Ready to Analyze</h3>
+            <p>Your results will appear here with detailed confidence scoring.</p>
           </div>
-          <button type="submit" aria-label="Analyze sentiment">
-            <span class="button-text">Analyze Sentiment</span>
-            <span class="button-icon">🔍</span>
-          </button>
-        </form>
 
+          <div id="response" class="response-content" style="display: none;">
+            </div>
+        </section>
 
-        <div
-          id="response"
-          style="display: none"
-          role="alert"
-          aria-live="polite"
-        ></div>
       </main>
 
-
       <footer>
-        <p>Built using Flask and PyTorch</p>
-        <p class="copyright">Copyright rights reserved to MS, 2024</p>
+        <p>Built with <strong>Flask</strong> & <strong>PyTorch</strong></p>
       </footer>
     </div>
 
-
-    <script>
-      // Get the current URL without the trailing slash
-      const baseUrl = window.location.origin;
-      console.log("Base URL:", baseUrl);
-    </script>
-
-
-    <script src="https://unpkg.com/loglevel/dist/loglevel.min.js"></script>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
   </body>
 </html>
