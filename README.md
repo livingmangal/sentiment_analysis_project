@@ -116,6 +116,11 @@ Example response:
     "raw_score": 2.4567
 }
 ```
+## API Documentation
+
+Detailed API documentation, including request/response formats, error codes, and usage instructions, is available here:
+
+- [API Documentation](docs/API.md)
 
 ## Deployment
 
