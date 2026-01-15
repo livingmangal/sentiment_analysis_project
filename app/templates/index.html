@@ -7,24 +7,10 @@
     <meta name="theme-color" content="#4a90e2" />
     <title>Sentiment Analysis</title>
     <link rel="icon" href="{{ url_for('static', filename='images/favicon.ico') }}" type="image/x-icon">
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-</head>
-<body>
-    <link
-      rel="stylesheet"
-      href="{{ url_for('static', filename='css/style.css') }}"
-    />
-
-
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
-      rel="stylesheet"
-    />
   </head>
   <body>
     <!-- Background image container -->
@@ -35,48 +21,61 @@
 
     <div class="container">
       <header>
-        <h2>Sentiment Analysis</h2>
+        <h1>Sentiment Analysis</h1>
         <p class="subtitle">Analyze the sentiment of any text</p>
       </header>
 
-
-      <main>
-        <form id="sentimentForm">
-          <div class="form-group">
-            <label for="text">Enter your text:</label>
-            <textarea
-              id="text"
-              name="text"
-              required
-              placeholder="Type something to analyze..."
-              autocomplete="off"
-              aria-label="Text input for sentiment analysis"
-              rows="4"
-              maxlength="500"
-            ></textarea>
-            <div class="char-counter" id="charCounter" aria-live="polite">
-              0 / 500 characters
+      <div class="main-layout">
+        <main class="main-content">
+          <form id="sentimentForm">
+            <div class="form-group">
+              <textarea
+                id="text"
+                name="text"
+                required
+                placeholder="Type something to analyze..."
+                autocomplete="off"
+                aria-label="Text input for sentiment analysis"
+                rows="5"
+                maxlength="500"
+              ></textarea>
+              <div class="char-counter" id="charCounter" aria-live="polite">
+                0 / 500
+              </div>
             </div>
+            <button type="submit" aria-label="Analyze sentiment">
+              Analyze Sentiment
+            </button>
+          </form>
+
+          <div
+            id="response"
+            style="display: none"
+            role="alert"
+            aria-live="polite"
+          ></div>
+        </main>
+
+        <!-- History Sidebar -->
+        <aside class="history-sidebar" id="historySidebar">
+          <div class="history-header">
+            <h3>History</h3>
+            <button class="toggle-history" id="toggleHistory" aria-label="Toggle history sidebar">
+              <span id="toggleIcon">▼</span>
+            </button>
           </div>
-          <button type="submit" aria-label="Analyze sentiment">
-            <span class="button-text">Analyze Sentiment</span>
-            <span class="button-icon">🔍</span>
-          </button>
-        </form>
-
-
-        <div
-          id="response"
-          style="display: none"
-          role="alert"
-          aria-live="polite"
-        ></div>
-      </main>
-
+          <div class="history-content" id="historyContent">
+            <div class="history-loading" id="historyLoading">Loading...</div>
+            <div class="history-empty" id="historyEmpty" style="display: none;">
+              <p>No predictions yet</p>
+            </div>
+            <div class="history-list" id="historyList"></div>
+          </div>
+        </aside>
+      </div>
 
       <footer>
-        <p>Built using Flask and PyTorch</p>
-        <p class="copyright">Copyright rights reserved to MS, 2024</p>
+        <p>Built with Flask and PyTorch</p>
       </footer>
     </div>
 
