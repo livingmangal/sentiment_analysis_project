@@ -8,6 +8,8 @@ import random
 import pandas as pd
 from sklearn.model_selection import train_test_split
 import os
+import json
+from datetime import datetime
 
 # Get the directory of the current script
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -30,9 +32,9 @@ def create_and_train_model():
         stratify=[label for _, label in training_data]
     )
     
-    # Create and fit preprocessor with minimal settings
+    # Create and fit preprocessor
     all_texts = [text for text, _ in training_data]
-    preprocessor = TextPreprocessor(max_vocab_size=5000, max_seq_length=20)
+    preprocessor = TextPreprocessor(max_vocab_size=10000, max_seq_length=20)
     preprocessor.fit(all_texts)
     
     # Create model
@@ -42,13 +44,13 @@ def create_and_train_model():
         hidden_dim=64,
         output_dim=1,
         num_layers=1,
-        dropout=0.2,
+        dropout=0.1,
         bidirectional=True
     )
     
-    # Training setup
     criterion = nn.BCEWithLogitsLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    optimizer = optim.Adam(model.parameters(), lr=0.0005, weight_decay=1e-5)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=2, factor=0.5)
     
     # Convert data to tensors and create DataLoaders
     X_train = torch.stack([preprocessor.transform(text) for text, _ in train_data])
@@ -59,29 +61,28 @@ def create_and_train_model():
     # Create DataLoaders
     train_dataset = TensorDataset(X_train, y_train)
     val_dataset = TensorDataset(X_val, y_val)
-    train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=64, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
     
     # Training loop
-    num_epochs = 10
+    num_epochs = 20
     best_val_loss = float('inf')
     
     print("Starting training...")
     print(f"Training samples: {len(train_data)}")
     print(f"Validation samples: {len(val_data)}")
     
-    model.train()
     for epoch in range(num_epochs):
+        model.train()
         total_loss = 0
-        
-        # Process in batches using DataLoader
-        for batch_X, batch_y in train_loader:
+        for i, (batch_X, batch_y) in enumerate(train_loader):
             optimizer.zero_grad()
             outputs = model(batch_X)
-            loss = criterion(outputs.squeeze(), batch_y)
+            loss = criterion(outputs.view(-1), batch_y)
             loss.backward()
-            optimizer.step()
             
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            optimizer.step()
             total_loss += loss.item()
         
         # Validation
@@ -101,6 +102,9 @@ def create_and_train_model():
         val_loss /= len(val_loader)
         val_acc /= len(val_dataset)
         
+        # Update scheduler
+        scheduler.step(val_loss)
+        
         model.train()
         
         # Print progress
@@ -114,11 +118,29 @@ def create_and_train_model():
             # Save best model
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
-                torch.save(model.state_dict(), os.path.join(project_root, 'models', 'lstm_model.pth'))
+                model.save(os.path.join(project_root, 'models', 'lstm_model.pth'))
                 preprocessor.save(os.path.join(project_root, 'models', 'preprocessor.pkl'))
+                # Save metadata
+                metadata = {
+                    "version": "2.0",
+                    "training_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "val_accuracy": round(val_acc, 4),
+                    "val_loss": round(val_loss, 4)
+                }
+                with open(os.path.join(project_root, 'models', 'metadata.json'), 'w') as f:
+                    json.dump(metadata, f)
     
-    # Load best model for testing
-    model.load_state_dict(torch.load(os.path.join(project_root, 'models', 'lstm_model.pth')))
+    # Load best model for evaluation
+    best_model_path = os.path.join(project_root, 'models', 'lstm_model.pth')
+    if os.path.exists(best_model_path):
+        try:
+            # Use the load class method we defined in SentimentLSTM
+            model = SentimentLSTM.load(best_model_path)
+            print("Loaded best model for evaluation.")
+        except Exception as e:
+            print(f"Error loading best model: {e}")
+            # Fallback to current model state
+            pass
     model.eval()
     
     # Test the model

@@ -1,3 +1,12 @@
+import sys
+import os
+
+# Add project root to sys.path automatically
+basedir = os.path.abspath(os.path.dirname(__file__))
+project_root = os.path.dirname(basedir)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 from flask import Flask, request, jsonify, render_template, Response
 from flask_cors import CORS
 from src.predict import initialize_predictor, predict_sentiment
@@ -15,7 +24,6 @@ from app.database import (
 from app.analytics import get_sentiment_trends, get_sentiment_summary
 import logging
 from typing import Dict, Any
-import os
 import json
 import time
 import uuid
@@ -273,7 +281,16 @@ def export_data():
 @app.route('/clear-history', methods=['POST'])
 def clear_history():
     try:
+        # Clear SQLite history
         clear_all_predictions()
+        
+        # Clear SQLAlchemy history for current session
+        session_id = get_session_id()
+        db_session = get_db_session(db_engine)
+        db_session.query(Prediction).filter(Prediction.session_id == session_id).delete()
+        db_session.commit()
+        db_session.close()
+        
         return jsonify({'status': 'success', 'message': 'History cleared'}), 200
     except Exception as e:
         logger.error(f"Clear history error: {str(e)}")

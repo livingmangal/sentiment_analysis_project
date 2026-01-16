@@ -1,6 +1,1 @@
-{
-    "model_version": "v2.0.0",
-    "training_date": "2026-01-13",
-    "model_type": "LSTM-BiDir",
-    "accuracy": "0.92"
-}
+{"version": "2.0", "training_date": "2026-01-16 17:18:17", "val_accuracy": 1.0, "val_loss": 0.0001}
