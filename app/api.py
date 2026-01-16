@@ -52,10 +52,18 @@ app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 
 # Configure CORS
+# Get allowed origins from environment variable, default to "*" (allow all) for development
+allowed_origins_env = os.environ.get('ALLOWED_ORIGINS', '*')
+if allowed_origins_env != '*':
+    # Split comma-separated string into a list of origins
+    allowed_origins = [origin.strip() for origin in allowed_origins_env.split(',')]
+else:
+    allowed_origins = '*'
+
 CORS(app, 
      resources={
          r"/*": {
-             "origins": "*",
+             "origins": allowed_origins,
              "methods": ["GET", "POST", "OPTIONS"],
              "allow_headers": ["Content-Type", "Authorization", "Accept", "X-Session-ID"]
          }
