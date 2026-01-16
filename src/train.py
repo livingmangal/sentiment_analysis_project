@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
-from model import SentimentGRU
+from model import SentimentLSTM
 from preprocessing import TextPreprocessor
 import random
 import pandas as pd
@@ -38,7 +38,7 @@ def create_and_train_model():
     preprocessor.fit(all_texts)
     
     # Create model
-    model = SentimentGRU(
+    model = SentimentLSTM(
         vocab_size=preprocessor.vocab_size,
         embedding_dim=64,
         hidden_dim=64,
@@ -134,8 +134,8 @@ def create_and_train_model():
     best_model_path = os.path.join(project_root, 'models', 'lstm_model.pth')
     if os.path.exists(best_model_path):
         try:
-            # Use the load class method we defined in SentimentGRU
-            model = SentimentGRU.load(best_model_path)
+            # Use the load class method we defined in SentimentLSTM
+            model = SentimentLSTM.load(best_model_path)
             print("Loaded best model for evaluation.")
         except Exception as e:
             print(f"Error loading best model: {e}")

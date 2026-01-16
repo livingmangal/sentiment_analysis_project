@@ -1,16 +1,16 @@
 import torch
 import torch.nn as nn
 
-class SentimentGRU(nn.Module):
+class SentimentLSTM(nn.Module):
     def __init__(self, vocab_size: int, embedding_dim: int, hidden_dim: int, output_dim: int,
                  num_layers: int = 1, dropout: float = 0.0, bidirectional: bool = False):
-        super(SentimentGRU, self).__init__()
+        super(SentimentLSTM, self).__init__()
         
         # Simple embedding layer
         self.embedding = nn.Embedding(vocab_size, embedding_dim, padding_idx=0)
         
-        # Single layer GRU
-        self.lstm = nn.GRU(
+        # Single layer LSTM
+        self.lstm = nn.LSTM(
             embedding_dim,
             hidden_dim,
             num_layers=num_layers,
@@ -33,8 +33,9 @@ class SentimentGRU(nn.Module):
         
         embedded = self.embedding(x)  # (batch_size, seq_length, embedding_dim)
         
-        # Pass through GRU
-        lstm_out, hidden = self.lstm(embedded)
+        # Pass through LSTM
+        # LSTM returns (output, (hidden, cell))
+        lstm_out, (hidden, cell) = self.lstm(embedded)
         
         # Apply mask to outputs to ignore padding in average
         masked_out = lstm_out * mask
@@ -63,7 +64,7 @@ class SentimentGRU(nn.Module):
         }, path)
     
     @classmethod
-    def load(cls, path: str) -> 'SentimentGRU':
+    def load(cls, path: str) -> 'SentimentLSTM':
         """Load model state"""
         checkpoint = torch.load(path)
         

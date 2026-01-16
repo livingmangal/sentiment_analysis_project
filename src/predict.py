@@ -3,7 +3,7 @@ import sys
 from typing import Dict, Any
 import os
 import json
-from src.model import SentimentGRU
+from src.model import SentimentLSTM
 from src.preprocessing import TextPreprocessor
 
 # Get the directory of the current script
@@ -35,7 +35,7 @@ class SentimentPredictor:
         self.preprocessor = TextPreprocessor.load(preprocessor_path)
         
         # Load model using the class method
-        self.model = SentimentGRU.load(model_path)
+        self.model = SentimentLSTM.load(model_path)
         
         # Set model to evaluation mode
         self.model.eval()
