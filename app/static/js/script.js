@@ -360,3 +360,23 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 });
+// ---- Copy to Clipboard (added feature) ----
+const copyContainer = document.getElementById("copyContainer");
+const copyBtn = document.getElementById("copyBtn");
+const copyFeedback = document.getElementById("copyFeedback");
+
+if (copyContainer) copyContainer.style.display = "block";
+
+if (copyBtn) {
+    copyBtn.onclick = async () => {
+        try {
+            await navigator.clipboard.writeText(
+                `${sentiment.toUpperCase()} (${confidence}%)`
+            );
+            copyFeedback.innerText = "Copied!";
+            setTimeout(() => copyFeedback.innerText = "", 1500);
+        } catch {
+            copyFeedback.innerText = "Copy failed";
+        }
+    };
+}
