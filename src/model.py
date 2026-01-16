@@ -65,18 +65,22 @@ class SentimentLSTM(nn.Module):
     
     @classmethod
     def load(cls, path: str) -> 'SentimentLSTM':
-        """Load model state"""
-        checkpoint = torch.load(path)
+        """Load model state from path"""
+        # Ensure model is loaded to CPU to avoid device mismatch issues
+        device = torch.device('cpu')
+        checkpoint = torch.load(path, map_location=device)
         
+        # Extract model parameters from checkpoint
         model = cls(
-            vocab_size=checkpoint['vocab_size'],
-            embedding_dim=checkpoint['embedding_dim'],
-            hidden_dim=checkpoint['hidden_dim'],
-            output_dim=checkpoint['output_dim'],
-            num_layers=checkpoint['num_layers'],
-            dropout=checkpoint['dropout'],
-            bidirectional=checkpoint['bidirectional']
+            vocab_size=checkpoint.get('vocab_size', 10000),
+            embedding_dim=checkpoint.get('embedding_dim', 100),
+            hidden_dim=checkpoint.get('hidden_dim', 128),
+            output_dim=checkpoint.get('output_dim', 1),
+            num_layers=checkpoint.get('num_layers', 1),
+            dropout=checkpoint.get('dropout', 0.0),
+            bidirectional=checkpoint.get('bidirectional', False)
         )
         
         model.load_state_dict(checkpoint['model_state_dict'])
+        model.eval() # Set to evaluation mode by default
         return model
