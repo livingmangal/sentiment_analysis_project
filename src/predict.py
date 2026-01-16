@@ -1,8 +1,9 @@
 import torch
+import sys
 from typing import Dict, Any
 import os
 import json
-from src.model import SentimentLSTM
+from src.model import SentimentGRU
 from src.preprocessing import TextPreprocessor
 
 # Get the directory of the current script
@@ -33,19 +34,8 @@ class SentimentPredictor:
         # Load preprocessor
         self.preprocessor = TextPreprocessor.load(preprocessor_path)
         
-        # Create model with same architecture as training
-        self.model = SentimentLSTM(
-            vocab_size=self.preprocessor.vocab_size,
-            embedding_dim=64,
-            hidden_dim=64,
-            output_dim=1,
-            num_layers=1,
-            dropout=0.2,
-            bidirectional=True
-        )
-        
-        # Load the trained weights
-        self.model.load_state_dict(torch.load(model_path))
+        # Load model using the class method
+        self.model = SentimentGRU.load(model_path)
         
         # Set model to evaluation mode
         self.model.eval()

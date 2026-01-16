@@ -273,7 +273,16 @@ def export_data():
 @app.route('/clear-history', methods=['POST'])
 def clear_history():
     try:
+        # Clear SQLite history
         clear_all_predictions()
+        
+        # Clear SQLAlchemy history for current session
+        session_id = get_session_id()
+        db_session = get_db_session(db_engine)
+        db_session.query(Prediction).filter(Prediction.session_id == session_id).delete()
+        db_session.commit()
+        db_session.close()
+        
         return jsonify({'status': 'success', 'message': 'History cleared'}), 200
     except Exception as e:
         logger.error(f"Clear history error: {str(e)}")

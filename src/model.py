@@ -1,16 +1,16 @@
 import torch
 import torch.nn as nn
 
-class SentimentLSTM(nn.Module):
+class SentimentGRU(nn.Module):
     def __init__(self, vocab_size: int, embedding_dim: int, hidden_dim: int, output_dim: int,
                  num_layers: int = 1, dropout: float = 0.0, bidirectional: bool = False):
-        super(SentimentLSTM, self).__init__()
+        super(SentimentGRU, self).__init__()
         
         # Simple embedding layer
-        self.embedding = nn.Embedding(vocab_size, embedding_dim)
+        self.embedding = nn.Embedding(vocab_size, embedding_dim, padding_idx=0)
         
-        # Single layer LSTM
-        self.lstm = nn.LSTM(
+        # Single layer GRU
+        self.lstm = nn.GRU(
             embedding_dim,
             hidden_dim,
             num_layers=num_layers,
@@ -28,22 +28,25 @@ class SentimentLSTM(nn.Module):
         
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x shape: (batch_size, seq_length)
+        # Create mask for padding (assuming 0 is padding)
+        mask = (x != 0).float().unsqueeze(-1)
         
-        # Get embeddings
         embedded = self.embedding(x)  # (batch_size, seq_length, embedding_dim)
         
-        # Pass through LSTM
-        lstm_out, _ = self.lstm(embedded)  # (batch_size, seq_length, hidden_dim)
+        # Pass through GRU
+        lstm_out, hidden = self.lstm(embedded)
         
-        # Get the last output
-        last_hidden = lstm_out[:, -1, :]  # (batch_size, hidden_dim)
+        # Apply mask to outputs to ignore padding in average
+        masked_out = lstm_out * mask
         
-        # Apply dropout
-        dropped = self.dropout(last_hidden)
+        # Global Average Pooling
+        # Sum across sequence length and divide by actual length
+        sum_out = torch.sum(masked_out, dim=1)
+        actual_lengths = torch.sum(mask, dim=1).clamp(min=1)
+        avg_pool = sum_out / actual_lengths
         
-        # Pass through linear layer
-        output = self.fc(dropped)  # (batch_size, output_dim)
-        
+        dropped = self.dropout(avg_pool)
+        output = self.fc(dropped)
         return output
     
     def save(self, path: str) -> None:
@@ -60,7 +63,7 @@ class SentimentLSTM(nn.Module):
         }, path)
     
     @classmethod
-    def load(cls, path: str) -> 'SentimentLSTM':
+    def load(cls, path: str) -> 'SentimentGRU':
         """Load model state"""
         checkpoint = torch.load(path)
         
