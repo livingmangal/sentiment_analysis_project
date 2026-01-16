@@ -1,3 +1,12 @@
+import sys
+import os
+
+# Add project root to sys.path automatically
+basedir = os.path.abspath(os.path.dirname(__file__))
+project_root = os.path.dirname(basedir)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 from flask import Flask, request, jsonify, render_template, Response
 from flask_cors import CORS
 from src.predict import initialize_predictor, predict_sentiment
@@ -15,7 +24,6 @@ from app.database import (
 from app.analytics import get_sentiment_trends, get_sentiment_summary
 import logging
 from typing import Dict, Any
-import os
 import json
 import time
 import uuid
