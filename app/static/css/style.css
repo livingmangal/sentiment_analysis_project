@@ -30,7 +30,7 @@ body {
     overflow-x: hidden;
 }
 
-
+/* Background Shapes */
 .bg-shape {
     position: fixed;
     border-radius: 50%;
@@ -116,7 +116,7 @@ h1 {
     padding: 2rem;
 }
 
-
+/* Input Section */
 .form-header {
     display: flex;
     justify-content: space-between;
@@ -206,7 +206,7 @@ kbd {
     transform: none;
 }
 
-
+/* Result Section */
 .result-section {
     display: flex;
     flex-direction: column;
@@ -281,7 +281,7 @@ kbd {
     font-weight: 600;
 }
 
-
+/* Analytics */
 .analytics-header {
     display: flex;
     justify-content: space-between;
@@ -318,7 +318,7 @@ kbd {
     height: 300px;
 }
 
-
+/* History Sidebar */
 .history-sidebar {
     margin-top: 2rem;
 }
@@ -398,28 +398,4 @@ footer {
 @keyframes fadeInUp {
     from { opacity: 0; transform: translateY(20px); }
     to { opacity: 1; transform: translateY(0); }
-}
-
-
-
-#copyBtn {
-    margin-top: 10px;
-    padding: 6px 14px;
-    border-radius: 6px;
-    border: 1px solid var(--primary);
-    background: white;
-    color: var(--primary);
-    font-weight: 600;
-    cursor: pointer;
-}
-
-#copyBtn:hover {
-    background: var(--primary);
-    color: white;
-}
-
-#copyFeedback {
-    font-size: 0.85rem;
-    margin-left: 8px;
-    color: var(--success);
 }
