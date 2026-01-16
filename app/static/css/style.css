@@ -399,24 +399,3 @@ footer {
     from { opacity: 0; transform: translateY(20px); }
     to { opacity: 1; transform: translateY(0); }
 }
-/* Copy to Clipboard */
-#copyBtn {
-    padding: 6px 14px;
-    border-radius: 6px;
-    border: 1px solid var(--primary);
-    background: white;
-    color: var(--primary);
-    font-weight: 600;
-    cursor: pointer;
-}
-
-#copyBtn:hover {
-    background: var(--primary);
-    color: white;
-}
-
-#copyFeedback {
-    margin-left: 8px;
-    font-size: 0.85rem;
-    color: var(--success);
-}

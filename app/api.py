@@ -9,7 +9,7 @@ if project_root not in sys.path:
 
 from flask import Flask, request, jsonify, render_template, Response
 from flask_cors import CORS
-from src.predict import initialize_predictor, predict_sentiment
+from src.predict import initialize_predictor, predict_sentiment, predict_sentiment_batch
 from src.database import (
     init_db,
     get_db_session,
@@ -108,9 +108,6 @@ def predict() -> tuple[Dict[str, Any], int]:
     # Handle preflight request
     if request.method == 'OPTIONS':
         return jsonify({'status': 'ok'}), 200
-    
-    # Reduced delay for better UX
-    time.sleep(1) 
         
     try:
         if not request.is_json:
@@ -154,14 +151,13 @@ def predict() -> tuple[Dict[str, Any], int]:
                 db_session.close()
             except Exception as db_error:
                 logger.error(f"Failed to save prediction to database: {str(db_error)}")
-                # Continue even if database save fails
             
             # Add session ID to response
             response_data = result.copy()
             response_data['session_id'] = session_id
             response_data['prediction_id'] = prediction_id
             
-            # Save to database with client timestamp if provided
+            # Save to analytics database
             save_prediction(
                 text=text,
                 sentiment=result.get('sentiment', 'unknown'),
@@ -177,6 +173,66 @@ def predict() -> tuple[Dict[str, Any], int]:
 
     except Exception as e:
         logger.error(f"Error processing request: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/predict_batch', methods=['POST', 'OPTIONS'])
+def predict_batch() -> tuple[Dict[str, Any], int]:
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+        
+    try:
+        if not request.is_json:
+            return jsonify({'error': 'Content-Type must be application/json'}), 400
+        
+        data = request.get_json()
+        if not data or 'texts' not in data or not isinstance(data['texts'], list):
+            return jsonify({'error': 'Missing or invalid "texts" field in request'}), 400
+        
+        texts = data['texts']
+        if not texts:
+            return jsonify({'results': []}), 200
+            
+        # Limit batch size
+        if len(texts) > 50:
+            return jsonify({'error': 'Batch size exceeds the maximum limit of 50'}), 400
+            
+        try:
+            results = predict_sentiment_batch(texts)
+            session_id = get_session_id()
+            
+            # Save all predictions to database
+            try:
+                db_session = get_db_session(db_engine)
+                for text, result in zip(texts, results):
+                    prediction = Prediction(
+                        input_data=json.dumps({'text': text}),
+                        prediction_result=json.dumps(result),
+                        session_id=session_id
+                    )
+                    db_session.add(prediction)
+                    
+                    # Also save to analytics database
+                    save_prediction(
+                        text=text,
+                        sentiment=result.get('sentiment', 'unknown'),
+                        confidence=result.get('confidence', 0.0)
+                    )
+                db_session.commit()
+                db_session.close()
+            except Exception as db_error:
+                logger.error(f"Failed to save batch predictions: {str(db_error)}")
+                
+            return jsonify({
+                'results': results,
+                'session_id': session_id
+            }), 200
+            
+        except Exception as e:
+            logger.error(f"Batch prediction error: {str(e)}")
+            return jsonify({'error': f'Batch prediction failed: {str(e)}'}), 500
+
+    except Exception as e:
+        logger.error(f"Error processing batch request: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/history', methods=['GET', 'OPTIONS'])
