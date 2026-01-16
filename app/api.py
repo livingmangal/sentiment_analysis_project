@@ -4,12 +4,15 @@ from src.predict import initialize_predictor, predict_sentiment
 from src.database import (
     init_db,
     get_db_session,
-    Prediction,
+    Prediction
+)
+from app.database import (
+    init_db as init_sqlite_db,
     save_prediction,
     get_all_predictions,
     clear_all_predictions
 )
-from src.analytics import get_sentiment_trends, get_sentiment_summary
+from app.analytics import get_sentiment_trends, get_sentiment_summary
 import logging
 from typing import Dict, Any
 import os
@@ -52,7 +55,7 @@ CORS(app,
 
 # Initialize the database and predictor
 try:
-    init_db()
+    init_sqlite_db()
     logger.info("Database initialized successfully")
     initialize_predictor()
     logger.info("Sentiment predictor initialized successfully")
@@ -149,7 +152,6 @@ def predict() -> tuple[Dict[str, Any], int]:
             response_data = result.copy()
             response_data['session_id'] = session_id
             response_data['prediction_id'] = prediction_id
-                return jsonify({'error': 'Invalid prediction result format'}), 500
             
             # Save to database with client timestamp if provided
             save_prediction(
