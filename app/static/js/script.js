@@ -6,7 +6,11 @@ const logger = {
 };
 
 // State
-let sessionId = localStorage.getItem('session_id') || null;
+let sessionId = localStorage.getItem('session_id');
+if (!sessionId) {
+    sessionId = 'sess-' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    localStorage.setItem('session_id', sessionId);
+}
 let sentimentChart = null;
 const maxLength = 500;
 const baseUrl = window.location.origin;
@@ -108,7 +112,10 @@ document.addEventListener("DOMContentLoaded", function () {
         clearHistoryBtn.addEventListener("click", async () => {
             if (confirm("Are you sure you want to clear all history?")) {
                 try {
-                    const response = await fetch('/clear-history', { method: 'POST' });
+                    const response = await fetch('/clear-history', { 
+                        method: 'POST',
+                        headers: { "X-Session-ID": sessionId }
+                    });
                     if (response.ok) {
                         localStorage.removeItem('sentiment_history');
                         fetchAnalytics();
@@ -325,7 +332,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     async function fetchAnalytics() {
         try {
-            const response = await fetch('/analytics');
+            const response = await fetch('/analytics', {
+                headers: { "X-Session-ID": sessionId }
+            });
             if (!response.ok) return;
             const data = await response.json();
             if (data.trends && data.trends.length > 0) {

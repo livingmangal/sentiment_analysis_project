@@ -144,6 +144,7 @@ def get_session_id():
     return session_id
 
 @app.route('/')
+@limiter.exempt
 def home() -> str:
     """Serve the main page"""
     return render_template('index.html')
