@@ -74,6 +74,11 @@ document.addEventListener("DOMContentLoaded", function () {
                 });
 
                 const data = await response.json();
+                
+                if (response.status === 429) {
+                    throw new Error("Slow down! You've reached the request limit. Please wait a minute before trying again.");
+                }
+                
                 if (!response.ok) throw new Error(data.error || "Server Error");
 
                 if (data.session_id) {
@@ -229,6 +234,11 @@ document.addEventListener("DOMContentLoaded", function () {
             const response = await fetch(`${baseUrl}/history`, {
                 headers: { "X-Session-ID": sessionId || "" }
             });
+            
+            if (response.status === 429) {
+                throw new Error("Rate limit exceeded for history. Please wait.");
+            }
+            
             if (!response.ok) throw new Error("Failed to load history");
 
             const data = await response.json();
@@ -297,6 +307,12 @@ document.addEventListener("DOMContentLoaded", function () {
                 method: "POST",
                 headers: { "X-Session-ID": sessionId || "" }
             });
+            
+            if (response.status === 429) {
+                logger.error("Rate limit hit for favorites");
+                return;
+            }
+            
             if (response.ok) {
                 const data = await response.json();
                 btn.classList.toggle('favorited', data.is_favorite);

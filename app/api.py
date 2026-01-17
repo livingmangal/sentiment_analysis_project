@@ -65,11 +65,15 @@ def get_client_identifier():
 limiter = Limiter(
     key_func=get_client_identifier,
     app=app,
-    default_limits=["200 per day", "50 per hour", "5 per minute"],
+    default_limits=["200 per day", "50 per hour", "15 per minute"],
     storage_uri="memory://",
     strategy="fixed-window",
-    headers_enabled=True,
+    headers_enabled=True
 )
+
+@limiter.request_filter
+def exempt_options():
+    return request.method == "OPTIONS"
 
 # Custom error message for rate limiting
 @app.errorhandler(429)
@@ -145,7 +149,7 @@ def home() -> str:
     return render_template('index.html')
 
 @app.route('/predict', methods=['POST', 'OPTIONS'])
-@limiter.limit("5 per minute")
+@limiter.limit("15 per minute")
 def predict() -> tuple[Dict[str, Any], int]:
     # Handle preflight request
     if request.method == 'OPTIONS':
@@ -218,7 +222,7 @@ def predict() -> tuple[Dict[str, Any], int]:
         return jsonify({'error': str(e)}), 500
 
 @app.route('/predict_batch', methods=['POST', 'OPTIONS'])
-@limiter.limit("5 per minute")
+@limiter.limit("15 per minute")
 def predict_batch() -> tuple[Dict[str, Any], int]:
     if request.method == 'OPTIONS':
         return jsonify({'status': 'ok'}), 200
