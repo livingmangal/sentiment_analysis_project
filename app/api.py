@@ -221,8 +221,7 @@ def predict() -> tuple[Dict[str, Any], int]:
     except Exception as e:
         logger.error(f"Error processing request: {str(e)}")
         return jsonify({'error': str(e)}), 500
-
-@app.route('/predict_batch', methods=['POST', 'OPTIONS'])
+@app.route('/predict/batch', methods=['POST', 'OPTIONS'])
 @limiter.limit("15 per minute")
 def predict_batch() -> tuple[Dict[str, Any], int]:
     if request.method == 'OPTIONS':
