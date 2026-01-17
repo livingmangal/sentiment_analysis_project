@@ -183,7 +183,7 @@ def predict() -> tuple[Dict[str, Any], int]:
         logger.error(f"Error processing request: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/predict_batch', methods=['POST', 'OPTIONS'])
+@app.route('/predict/batch', methods=['POST', 'OPTIONS'])
 def predict_batch() -> tuple[Dict[str, Any], int]:
     if request.method == 'OPTIONS':
         return jsonify({'status': 'ok'}), 200
