@@ -6,7 +6,11 @@ const logger = {
 };
 
 // State
-let sessionId = localStorage.getItem('session_id') || null;
+let sessionId = localStorage.getItem('session_id');
+if (!sessionId) {
+    sessionId = 'sess-' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    localStorage.setItem('session_id', sessionId);
+}
 let sentimentChart = null;
 const maxLength = 500;
 const baseUrl = window.location.origin;
@@ -74,6 +78,11 @@ document.addEventListener("DOMContentLoaded", function () {
                 });
 
                 const data = await response.json();
+                
+                if (response.status === 429) {
+                    throw new Error("Slow down! You've reached the request limit. Please wait a minute before trying again.");
+                }
+                
                 if (!response.ok) throw new Error(data.error || "Server Error");
 
                 if (data.session_id) {
@@ -103,7 +112,10 @@ document.addEventListener("DOMContentLoaded", function () {
         clearHistoryBtn.addEventListener("click", async () => {
             if (confirm("Are you sure you want to clear all history?")) {
                 try {
-                    const response = await fetch('/clear-history', { method: 'POST' });
+                    const response = await fetch('/clear-history', { 
+                        method: 'POST',
+                        headers: { "X-Session-ID": sessionId }
+                    });
                     if (response.ok) {
                         localStorage.removeItem('sentiment_history');
                         fetchAnalytics();
@@ -229,6 +241,11 @@ document.addEventListener("DOMContentLoaded", function () {
             const response = await fetch(`${baseUrl}/history`, {
                 headers: { "X-Session-ID": sessionId || "" }
             });
+            
+            if (response.status === 429) {
+                throw new Error("Rate limit exceeded for history. Please wait.");
+            }
+            
             if (!response.ok) throw new Error("Failed to load history");
 
             const data = await response.json();
@@ -297,6 +314,12 @@ document.addEventListener("DOMContentLoaded", function () {
                 method: "POST",
                 headers: { "X-Session-ID": sessionId || "" }
             });
+            
+            if (response.status === 429) {
+                logger.error("Rate limit hit for favorites");
+                return;
+            }
+            
             if (response.ok) {
                 const data = await response.json();
                 btn.classList.toggle('favorited', data.is_favorite);
@@ -309,7 +332,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     async function fetchAnalytics() {
         try {
-            const response = await fetch('/analytics');
+            const response = await fetch('/analytics', {
+                headers: { "X-Session-ID": sessionId }
+            });
             if (!response.ok) return;
             const data = await response.json();
             if (data.trends && data.trends.length > 0) {
