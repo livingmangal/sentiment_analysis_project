@@ -38,7 +38,7 @@ class SentimentPredictor:
             vocab_size=self.preprocessor.vocab_size,
             embedding_dim=64,
             hidden_dim=64,
-            output_dim=1,
+            output_dim=3,
             num_layers=1,
             dropout=0.2,
             bidirectional=True
@@ -65,16 +65,18 @@ class SentimentPredictor:
         # Get prediction
         with torch.no_grad():
             output = self.model(text_tensor)
-            probability = torch.sigmoid(output).item()
+            probs = torch.softmax(output, dim=1)
+            pred_idx = torch.argmax(probs, dim=1).item()
             
         # Determine sentiment and confidence
-        sentiment = "Positive" if probability > 0.5 else "Negative"
-        confidence = probability if sentiment == "Positive" else 1 - probability
+        sentiment_map = {0: "Negative", 1: "Positive", 2: "Neutral"}
+        sentiment = sentiment_map.get(pred_idx, "Unknown")
+        confidence = probs[0][pred_idx].item()
         
         return {
             "sentiment": sentiment,
             "confidence": round(confidence, 4),
-            "raw_score": round(output.item(), 4),
+            "raw_scores": [round(x, 4) for x in probs[0].tolist()],
             "model_info": self.metadata 
         }
 

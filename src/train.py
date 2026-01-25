@@ -16,6 +16,7 @@ project_root = os.path.dirname(script_dir)
 def load_data(file_path: str):
     """Load and preprocess training data from CSV"""
     df = pd.read_csv(file_path)
+    # Ensure sentiment column handles new class "2" automatically
     return list(zip(df['text'].tolist(), df['sentiment'].tolist()))
 
 def create_and_train_model():
@@ -40,21 +41,21 @@ def create_and_train_model():
         vocab_size=preprocessor.vocab_size,
         embedding_dim=64,
         hidden_dim=64,
-        output_dim=1,
+        output_dim=3,  # Changed to 3 for Negative, Positive, Neutral
         num_layers=1,
         dropout=0.2,
         bidirectional=True
     )
     
     # Training setup
-    criterion = nn.BCEWithLogitsLoss()
+    criterion = nn.CrossEntropyLoss()  # Changed to CrossEntropyLoss for multi-class
     optimizer = optim.Adam(model.parameters(), lr=0.001)
     
     # Convert data to tensors and create DataLoaders
     X_train = torch.stack([preprocessor.transform(text) for text, _ in train_data])
-    y_train = torch.tensor([label for _, label in train_data], dtype=torch.float32)
+    y_train = torch.tensor([label for _, label in train_data], dtype=torch.long) # Changed to long
     X_val = torch.stack([preprocessor.transform(text) for text, _ in val_data])
-    y_val = torch.tensor([label for _, label in val_data], dtype=torch.float32)
+    y_val = torch.tensor([label for _, label in val_data], dtype=torch.long) # Changed to long
     
     # Create DataLoaders
     train_dataset = TensorDataset(X_train, y_train)
@@ -63,7 +64,7 @@ def create_and_train_model():
     val_loader = DataLoader(val_dataset, batch_size=64, shuffle=False)
     
     # Training loop
-    num_epochs = 10
+    num_epochs = 15 # Increased epochs slightly for multi-class
     best_val_loss = float('inf')
     
     print("Starting training...")
@@ -78,7 +79,7 @@ def create_and_train_model():
         for batch_X, batch_y in train_loader:
             optimizer.zero_grad()
             outputs = model(batch_X)
-            loss = criterion(outputs.squeeze(), batch_y)
+            loss = criterion(outputs, batch_y) # Removed squeeze
             loss.backward()
             optimizer.step()
             
@@ -91,10 +92,10 @@ def create_and_train_model():
         with torch.no_grad():
             for batch_X, batch_y in val_loader:
                 val_outputs = model(batch_X)
-                val_loss += criterion(val_outputs.squeeze(), batch_y).item()
+                val_loss += criterion(val_outputs, batch_y).item()
                 
                 # Calculate validation accuracy
-                val_preds = (torch.sigmoid(val_outputs.squeeze()) > 0.5).float()
+                val_preds = torch.argmax(val_outputs, dim=1)
                 val_acc += (val_preds == batch_y).float().sum().item()
         
         # Average validation metrics
@@ -104,7 +105,7 @@ def create_and_train_model():
         model.train()
         
         # Print progress
-        if (epoch + 1) % 1 == 0:  # Print every epoch since we have fewer epochs
+        if (epoch + 1) % 1 == 0:
             avg_loss = total_loss / len(train_loader)
             print(f'Epoch [{epoch+1}/{num_epochs}]')
             print(f'Training Loss: {avg_loss:.4f}')
@@ -133,16 +134,25 @@ def create_and_train_model():
         "this is wonderful",
         "this is horrible",
         "you are amazing",
-        "you are awful"
+        "you are awful",
+        "it was okay",
+        "average experience",
+        "nothing special",
+        "i don't care"
     ]
+    
+    sentiment_map = {0: "Negative", 1: "Positive", 2: "Neutral"}
     
     for text in test_texts:
         with torch.no_grad():
             input_tensor = preprocessor.transform(text).unsqueeze(0)
             output = model(input_tensor)
-            probability = torch.sigmoid(output).item()
-            sentiment = "Positive" if probability > 0.5 else "Negative"
-            print(f"Text: '{text}' -> {sentiment} (probability: {probability:.4f})")
+            probs = torch.softmax(output, dim=1)
+            pred_idx = torch.argmax(probs, dim=1).item()
+            confidence = probs[0][pred_idx].item()
+            sentiment = sentiment_map.get(pred_idx, "Unknown")
+            
+            print(f"Text: '{text}' -> {sentiment} (confidence: {confidence:.4f})")
 
 if __name__ == '__main__':
     # Set random seed for reproducibility
