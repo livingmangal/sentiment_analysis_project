@@ -1,6 +1,17 @@
+import sys
+import os
+
+# Add project root to sys.path automatically
+basedir = os.path.abspath(os.path.dirname(__file__))
+project_root = os.path.dirname(basedir)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 from flask import Flask, request, jsonify, render_template, Response
 from flask_cors import CORS
-from src.predict import initialize_predictor, predict_sentiment
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from src.predict import initialize_predictor, predict_sentiment, predict_sentiment_batch
 from src.database import (
     init_db,
     get_db_session,
@@ -15,7 +26,6 @@ from app.database import (
 from app.analytics import get_sentiment_trends, get_sentiment_summary
 import logging
 from typing import Dict, Any
-import os
 import json
 import time
 import uuid
@@ -29,25 +39,68 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Configuration
 # Get the directory where this file is located
 basedir = os.path.abspath(os.path.dirname(__file__))
 
 # Initialize Flask
-# Flask will automatically serve files from the 'static' folder found at 'basedir/static'
 app = Flask(__name__, 
     template_folder=os.path.join(basedir, 'templates'),
     static_folder=os.path.join(basedir, 'static')
 )
+
+def get_client_identifier():
+    """
+    Returns a unique identifier for the client based on:
+    1. X-Session-ID header
+    2. session_id cookie
+    3. Remote IP address (fallback)
+    This ensures rate limiting is "browser-based" rather than global.
+    """
+    return request.headers.get('X-Session-ID') or \
+           request.cookies.get('session_id') or \
+           get_remote_address()
+
+# Initialize Rate Limiter
+limiter = Limiter(
+    key_func=get_client_identifier,
+    app=app,
+    default_limits=["200 per day", "50 per hour", "15 per minute"],
+    storage_uri="memory://",
+    strategy="fixed-window",
+    headers_enabled=True
+)
+
+@limiter.request_filter
+def exempt_options():
+    return request.method == "OPTIONS"
+
+# Custom error message for rate limiting
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    return jsonify({
+        "error": "Rate limit exceeded",
+        "message": str(e.description),
+        "status": 429
+    }), 429
 
 # Disable caching for static files (helps during development)
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 
 # Configure CORS
+# Get allowed origins from environment variable, default to "*" (allow all) for development
+allowed_origins_env = os.environ.get('ALLOWED_ORIGINS', '*')
+if allowed_origins_env != '*':
+    # Split comma-separated string into a list of origins
+    allowed_origins = [origin.strip() for origin in allowed_origins_env.split(',')]
+else:
+    allowed_origins = '*'
+
 CORS(app, 
      resources={
          r"/*": {
-             "origins": "*",
+             "origins": allowed_origins,
              "methods": ["GET", "POST", "OPTIONS"],
              "allow_headers": ["Content-Type", "Authorization", "Accept", "X-Session-ID"]
          }
@@ -91,18 +144,17 @@ def get_session_id():
     return session_id
 
 @app.route('/')
+@limiter.exempt
 def home() -> str:
     """Serve the main page"""
     return render_template('index.html')
 
 @app.route('/predict', methods=['POST', 'OPTIONS'])
+@limiter.limit("15 per minute")
 def predict() -> tuple[Dict[str, Any], int]:
     # Handle preflight request
     if request.method == 'OPTIONS':
         return jsonify({'status': 'ok'}), 200
-    
-    # Reduced delay for better UX
-    time.sleep(1) 
         
     try:
         if not request.is_json:
@@ -146,14 +198,13 @@ def predict() -> tuple[Dict[str, Any], int]:
                 db_session.close()
             except Exception as db_error:
                 logger.error(f"Failed to save prediction to database: {str(db_error)}")
-                # Continue even if database save fails
             
             # Add session ID to response
             response_data = result.copy()
             response_data['session_id'] = session_id
             response_data['prediction_id'] = prediction_id
             
-            # Save to database with client timestamp if provided
+            # Save to analytics database
             save_prediction(
                 text=text,
                 sentiment=result.get('sentiment', 'unknown'),
@@ -169,6 +220,66 @@ def predict() -> tuple[Dict[str, Any], int]:
 
     except Exception as e:
         logger.error(f"Error processing request: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+@app.route('/predict/batch', methods=['POST', 'OPTIONS'])
+@limiter.limit("15 per minute")
+def predict_batch() -> tuple[Dict[str, Any], int]:
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+        
+    try:
+        if not request.is_json:
+            return jsonify({'error': 'Content-Type must be application/json'}), 400
+        
+        data = request.get_json()
+        if not data or 'texts' not in data or not isinstance(data['texts'], list):
+            return jsonify({'error': 'Missing or invalid "texts" field in request'}), 400
+        
+        texts = data['texts']
+        if not texts:
+            return jsonify({'results': []}), 200
+            
+        # Limit batch size
+        if len(texts) > 50:
+            return jsonify({'error': 'Batch size exceeds the maximum limit of 50'}), 400
+            
+        try:
+            results = predict_sentiment_batch(texts)
+            session_id = get_session_id()
+            
+            # Save all predictions to database
+            try:
+                db_session = get_db_session(db_engine)
+                for text, result in zip(texts, results):
+                    prediction = Prediction(
+                        input_data=json.dumps({'text': text}),
+                        prediction_result=json.dumps(result),
+                        session_id=session_id
+                    )
+                    db_session.add(prediction)
+                    
+                    # Also save to analytics database
+                    save_prediction(
+                        text=text,
+                        sentiment=result.get('sentiment', 'unknown'),
+                        confidence=result.get('confidence', 0.0)
+                    )
+                db_session.commit()
+                db_session.close()
+            except Exception as db_error:
+                logger.error(f"Failed to save batch predictions: {str(db_error)}")
+                
+            return jsonify({
+                'results': results,
+                'session_id': session_id
+            }), 200
+            
+        except Exception as e:
+            logger.error(f"Batch prediction error: {str(e)}")
+            return jsonify({'error': f'Batch prediction failed: {str(e)}'}), 500
+
+    except Exception as e:
+        logger.error(f"Error processing batch request: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/history', methods=['GET', 'OPTIONS'])
@@ -273,7 +384,16 @@ def export_data():
 @app.route('/clear-history', methods=['POST'])
 def clear_history():
     try:
+        # Clear SQLite history
         clear_all_predictions()
+        
+        # Clear SQLAlchemy history for current session
+        session_id = get_session_id()
+        db_session = get_db_session(db_engine)
+        db_session.query(Prediction).filter(Prediction.session_id == session_id).delete()
+        db_session.commit()
+        db_session.close()
+        
         return jsonify({'status': 'success', 'message': 'History cleared'}), 200
     except Exception as e:
         logger.error(f"Clear history error: {str(e)}")

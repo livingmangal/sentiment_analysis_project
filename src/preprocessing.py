@@ -4,12 +4,20 @@ import torch
 from typing import List, Tuple, Dict
 
 class TextPreprocessor:
-    def __init__(self, max_vocab_size: int = 10000, max_seq_length: int = 100):
+    def __init__(self, max_vocab_size: int = 10000, max_seq_length: int = 20):
         self.max_vocab_size = max_vocab_size
         self.max_seq_length = max_seq_length
         self.word_to_idx: Dict[str, int] = {}
         self.idx_to_word: Dict[int, str] = {}
         self.vocab_size = 0
+        self.stop_words = {
+            'the', 'a', 'an', 'is', 'was', 'were', 'be', 'been', 'being', 
+            'to', 'of', 'and', 'or', 'but', 'in', 'on', 'at', 'with', 'for',
+            'i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 'you', 'your', 'yours',
+            'he', 'him', 'his', 'she', 'her', 'hers', 'it', 'its', 'they', 'them', 'their',
+            'this', 'that', 'these', 'those', 'am', 'are', 'was', 'were', 'be', 'been', 'being'
+        }
+        self.clean_re = re.compile(r'[^\w\s]')
         
     def fit(self, texts: List[str]) -> None:
         """Build vocabulary from list of texts"""
@@ -26,15 +34,17 @@ class TextPreprocessor:
         self.word_to_idx = {word: idx for idx, word in enumerate(vocab)}
         self.idx_to_word = {idx: word for word, idx in self.word_to_idx.items()}
         self.vocab_size = len(vocab)
+        print(f"Vocab size: {self.vocab_size}")
+        print(f"Common words: {vocab[2:12]}")
     
     def _tokenize(self, text: str) -> List[str]:
         """Tokenize text into words"""
         # Convert to lowercase
         text = text.lower()
-        # Remove special characters and extra whitespace
-        text = re.sub(r'[^\w\s]', ' ', text)
-        # Split into words
-        return [word for word in text.split() if word]
+        # Remove special characters and extra whitespace using pre-compiled regex
+        text = self.clean_re.sub(' ', text)
+        # Split into words and filter stopwords
+        return [word for word in text.split() if word and word not in self.stop_words]
     
     def transform(self, text: str) -> torch.Tensor:
         """Convert text to tensor"""
@@ -45,15 +55,40 @@ class TextPreprocessor:
         words = self._tokenize(text)
         
         # Convert words to indices
-        indices = [self.word_to_idx.get(word, self.word_to_idx['<unk>']) for word in words]
+        unk_idx = self.word_to_idx['<unk>']
+        pad_idx = self.word_to_idx['<pad>']
+        indices = [self.word_to_idx.get(word, unk_idx) for word in words]
         
         # Pad or truncate
         if len(indices) > self.max_seq_length:
             indices = indices[:self.max_seq_length]
         else:
-            indices.extend([self.word_to_idx['<pad>']] * (self.max_seq_length - len(indices)))
+            padding = [pad_idx] * (self.max_seq_length - len(indices))
+            indices = padding + indices
         
         return torch.tensor(indices, dtype=torch.long)
+
+    def transform_batch(self, texts: List[str]) -> torch.Tensor:
+        """Convert list of texts to batch tensor"""
+        if not self.word_to_idx:
+            raise ValueError("Preprocessor not fitted. Call fit() first.")
+        
+        batch_indices = []
+        unk_idx = self.word_to_idx['<unk>']
+        pad_idx = self.word_to_idx['<pad>']
+        
+        for text in texts:
+            words = self._tokenize(text)
+            indices = [self.word_to_idx.get(word, unk_idx) for word in words]
+            
+            if len(indices) > self.max_seq_length:
+                indices = indices[:self.max_seq_length]
+            else:
+                padding = [pad_idx] * (self.max_seq_length - len(indices))
+                indices = padding + indices
+            batch_indices.append(indices)
+            
+        return torch.tensor(batch_indices, dtype=torch.long)
     
     def save(self, path: str) -> None:
         """Save preprocessor state"""

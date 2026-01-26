@@ -1,7 +1,10 @@
 import torch
-from typing import Dict, Any
+import sys
+from typing import Dict, Any, List
 import os
 import json
+import functools
+import time
 from src.model import SentimentLSTM
 from src.preprocessing import TextPreprocessor
 
@@ -10,7 +13,7 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(script_dir)
 
 class SentimentPredictor:
-    def __init__(self, model_path: str, preprocessor_path: str, metadata_path: str = None): 
+    def __init__(self, model_path: str, preprocessor_path: str, metadata_path: str = None, quantize: bool = False): 
         """Initialize the sentiment predictor with model, preprocessor, and metadata"""
         # Ensure paths are absolute
         model_path = os.path.abspath(model_path)
@@ -21,7 +24,7 @@ class SentimentPredictor:
         if not os.path.exists(preprocessor_path):
             raise FileNotFoundError(f"Preprocessor file not found at {preprocessor_path}")
         
-        # Load Metadata (New Section)
+        # Load Metadata
         self.metadata = {"version": "unknown", "training_date": "unknown"}
         if metadata_path and os.path.exists(metadata_path):
             try:
@@ -33,29 +36,32 @@ class SentimentPredictor:
         # Load preprocessor
         self.preprocessor = TextPreprocessor.load(preprocessor_path)
         
-        # Create model with same architecture as training
-        self.model = SentimentLSTM(
-            vocab_size=self.preprocessor.vocab_size,
-            embedding_dim=64,
-            hidden_dim=64,
-            output_dim=3,
-            num_layers=1,
-            dropout=0.2,
-            bidirectional=True
-        )
-        
-        # Load the trained weights
-        self.model.load_state_dict(torch.load(model_path))
+        # Load model using the class method
+        self.model = SentimentLSTM.load(model_path)
         
         # Set model to evaluation mode
         self.model.eval()
         
-        # Move model to CPU for Render deployment
+        # Move model to CPU
         self.device = torch.device('cpu')
         self.model = self.model.to(self.device)
-    
+
+        # Model Quantization (Dynamic Quantization for CPU)
+        if quantize:
+            try:
+                self.model = torch.quantization.quantize_dynamic(
+                    self.model, {torch.nn.Linear, torch.nn.LSTM}, dtype=torch.qint8
+                )
+                self.metadata["quantized"] = True
+            except Exception as e:
+                print(f"Warning: Model quantization failed: {e}")
+                self.metadata["quantized"] = False
+        else:
+            self.metadata["quantized"] = False
+
+    @functools.lru_cache(maxsize=1024)
     def predict(self, text: str) -> dict:
-        """Predict sentiment and include model metadata"""
+        """Predict sentiment for a single text with caching"""
         # Preprocess text
         text_tensor = self.preprocessor.transform(text)
         
@@ -64,7 +70,9 @@ class SentimentPredictor:
         
         # Get prediction
         with torch.no_grad():
+            start_time = time.time()
             output = self.model(text_tensor)
+            inference_time = time.time() - start_time
             probs = torch.softmax(output, dim=1)
             pred_idx = torch.argmax(probs, dim=1).item()
             
@@ -77,15 +85,50 @@ class SentimentPredictor:
             "sentiment": sentiment,
             "confidence": round(confidence, 4),
             "raw_scores": [round(x, 4) for x in probs[0].tolist()],
-            "model_info": self.metadata 
+            "model_info": self.metadata,
+            "inference_time_ms": round(inference_time * 1000, 2)
         }
+
+    def predict_batch(self, texts: List[str]) -> List[dict]:
+        """Predict sentiment for a batch of texts"""
+        if not texts:
+            return []
+            
+        # Preprocess all texts
+        batch_tensor = self.preprocessor.transform_batch(texts).to(self.device)
+        
+        # Get predictions
+        with torch.no_grad():
+            start_time = time.time()
+            outputs = self.model(batch_tensor)
+            inference_time = (time.time() - start_time) / len(texts)
+            
+            probs = torch.softmax(outputs, dim=1)
+            pred_indices = torch.argmax(probs, dim=1).tolist()
+            confidences = [probs[i][pred_idx].item() for i, pred_idx in enumerate(pred_indices)]
+            raw_scores = [probs[i].tolist() for i in range(len(texts))]
+            
+        sentiment_map = {0: "Negative", 1: "Positive", 2: "Neutral"}
+        results = []
+        for pred_idx, confidence, raw in zip(pred_indices, confidences, raw_scores):
+            sentiment = sentiment_map.get(pred_idx, "Unknown")
+            results.append({
+                "sentiment": sentiment,
+                "confidence": round(confidence, 4),
+                "raw_scores": [round(x, 4) for x in raw],
+                "model_info": self.metadata,
+                "inference_time_ms": round(inference_time * 1000, 2)
+            })
+            
+        return results
 
 # Global predictor instance
 _predictor = None
 
 def initialize_predictor(model_path: str = None,
                          preprocessor_path: str = None,
-                         metadata_path: str = None) -> None: 
+                         metadata_path: str = None,
+                         quantize: bool = True) -> None: 
     """Initialize the global predictor instance"""
     global _predictor
     
@@ -97,14 +140,21 @@ def initialize_predictor(model_path: str = None,
     if metadata_path is None:
         metadata_path = os.path.join(project_root, 'models', 'metadata.json')
         
-    _predictor = SentimentPredictor(model_path, preprocessor_path, metadata_path)
+    _predictor = SentimentPredictor(model_path, preprocessor_path, metadata_path, quantize=quantize)
 
 def predict_sentiment(text: str) -> dict:
-    """Wrapper for global predictor"""
+    """Wrapper for global predictor single prediction"""
     global _predictor
     if _predictor is None:
-        raise RuntimeError("Predictor not initialized. Call initialize_predictor() first.")
+        initialize_predictor()
     return _predictor.predict(text)
+
+def predict_sentiment_batch(texts: List[str]) -> List[dict]:
+    """Wrapper for global predictor batch prediction"""
+    global _predictor
+    if _predictor is None:
+        initialize_predictor()
+    return _predictor.predict_batch(texts)
 
 if __name__ == "__main__":
     try:
