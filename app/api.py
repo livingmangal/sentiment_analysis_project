@@ -43,11 +43,17 @@ logger = logging.getLogger(__name__)
 # Get the directory where this file is located
 basedir = os.path.abspath(os.path.dirname(__file__))
 
+from app.admin_routes import admin_bp
+from src.ab_testing.framework import ABTestingFramework, TrafficSplitStrategy
+
 # Initialize Flask
 app = Flask(__name__, 
     template_folder=os.path.join(basedir, 'templates'),
     static_folder=os.path.join(basedir, 'static')
 )
+
+# Register Admin Blueprint
+app.register_blueprint(admin_bp)
 
 def get_client_identifier():
     """
@@ -107,11 +113,35 @@ CORS(app,
      })
 
 # Initialize the database and predictor
+ab_framework = None
+
 try:
     init_sqlite_db()
     logger.info("Database initialized successfully")
-    initialize_predictor()
-    logger.info("Sentiment predictor initialized successfully")
+    
+    # Initialize AB Testing Framework
+    try:
+        ab_framework = ABTestingFramework.load_config("sentiment_v1")
+        logger.info("AB Testing Framework loaded from config")
+    except Exception:
+        logger.info("Initializing new AB Testing Framework")
+        ab_framework = ABTestingFramework("sentiment_v1", strategy=TrafficSplitStrategy.SESSION_HASH)
+        # Use default/latest model if possible, or wait for admin config
+        # Ideally we'd scan the registry for an active model here
+        from src.registry import ModelRegistry
+        registry = ModelRegistry()
+        latest = registry.get_latest_active_model()
+        if latest:
+             from src.ab_testing.framework import ModelVariant
+             variant = ModelVariant(
+                 variant_id=latest.version,
+                 model_path=latest.model_path,
+                 preprocessor_path=latest.preprocessor_path,
+                 description="Default active model"
+             )
+             ab_framework.add_variant(variant)
+             ab_framework.save_config()
+
 except Exception as e:
     logger.error(f"Initialization error: {str(e)}")
 
@@ -173,14 +203,23 @@ def predict() -> tuple[Dict[str, Any], int]:
             return jsonify({'error': 'Text exceeds the maximum limit of 1000 characters'}), 400
         
         try:
-            result = predict_sentiment(text)
+            # Get session ID early for AB testing
+            session_id = get_session_id()
+            
+            if ab_framework and ab_framework.variants:
+                try:
+                    result = ab_framework.predict(text, session_id=session_id)
+                except Exception as e:
+                    logger.error(f"AB Framework prediction failed: {e}")
+                    # Fallback
+                    result = predict_sentiment(text)
+            else:
+                result = predict_sentiment(text)
             
             if not isinstance(result, dict):
                 result = {'error': 'Invalid prediction result format'}
                 return jsonify(result), 500
             
-            # Get session ID
-            session_id = get_session_id()
             prediction_id = None
             
             # Save prediction to database
@@ -244,8 +283,16 @@ def predict_batch() -> tuple[Dict[str, Any], int]:
             return jsonify({'error': 'Batch size exceeds the maximum limit of 50'}), 400
             
         try:
-            results = predict_sentiment_batch(texts)
             session_id = get_session_id()
+            
+            if ab_framework and ab_framework.variants:
+                try:
+                    results = ab_framework.predict_batch(texts, session_id=session_id)
+                except Exception as e:
+                    logger.error(f"AB Framework batch prediction failed: {e}")
+                    results = predict_sentiment_batch(texts)
+            else:
+                results = predict_sentiment_batch(texts)
             
             # Save all predictions to database
             try:
