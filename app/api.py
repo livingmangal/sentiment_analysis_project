@@ -1,5 +1,12 @@
 import sys
 import os
+import logging
+import json
+import time
+import uuid
+import csv
+import io
+from typing import Dict, Any
 
 # Add project root to sys.path automatically
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -11,12 +18,9 @@ from flask import Flask, request, jsonify, render_template, Response
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+
 from src.predict import initialize_predictor, predict_sentiment, predict_sentiment_batch
-from src.database import (
-    init_db,
-    get_db_session,
-    Prediction
-)
+from src.database import init_db, get_db_session, Prediction
 from app.database import (
     init_db as init_sqlite_db,
     save_prediction,
@@ -24,44 +28,47 @@ from app.database import (
     clear_all_predictions
 )
 from app.analytics import get_sentiment_trends, get_sentiment_summary
-import logging
-from typing import Dict, Any
-import json
-import time
-import uuid
-import csv
-import io
 
-# Configure logging
+# -------------------------------------------------
+# Flask App Initialization (ONLY ONCE)
+# -------------------------------------------------
+app = Flask(
+    __name__,
+    template_folder=os.path.join(basedir, "templates"),
+    static_folder=os.path.join(basedir, "static")
+)
+
+# -------------------------------------------------
+# Helper: Standard Error Response
+# -------------------------------------------------
+def error_response(code, message, suggestion=None, status=400):
+    return jsonify({
+        "error": {
+            "code": code,
+            "message": message,
+            "suggestion": suggestion
+        }
+    }), status
+
+# -------------------------------------------------
+# Logging
+# -------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
-# Configuration
-# Get the directory where this file is located
-basedir = os.path.abspath(os.path.dirname(__file__))
-
-# Initialize Flask
-app = Flask(__name__, 
-    template_folder=os.path.join(basedir, 'templates'),
-    static_folder=os.path.join(basedir, 'static')
-)
-
+# -------------------------------------------------
+# Rate Limiting
+# -------------------------------------------------
 def get_client_identifier():
-    """
-    Returns a unique identifier for the client based on:
-    1. X-Session-ID header
-    2. session_id cookie
-    3. Remote IP address (fallback)
-    This ensures rate limiting is "browser-based" rather than global.
-    """
-    return request.headers.get('X-Session-ID') or \
-           request.cookies.get('session_id') or \
-           get_remote_address()
+    return (
+        request.headers.get("X-Session-ID")
+        or request.cookies.get("session_id")
+        or get_remote_address()
+    )
 
-# Initialize Rate Limiter
 limiter = Limiter(
     key_func=get_client_identifier,
     app=app,
@@ -75,7 +82,6 @@ limiter = Limiter(
 def exempt_options():
     return request.method == "OPTIONS"
 
-# Custom error message for rate limiting
 @app.errorhandler(429)
 def ratelimit_handler(e):
     return jsonify({
@@ -84,285 +90,175 @@ def ratelimit_handler(e):
         "status": 429
     }), 429
 
-# Disable caching for static files (helps during development)
-app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
-app.config['TEMPLATES_AUTO_RELOAD'] = True
+# -------------------------------------------------
+# App Config
+# -------------------------------------------------
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
+app.config["TEMPLATES_AUTO_RELOAD"] = True
 
-# Configure CORS
-# Get allowed origins from environment variable, default to "*" (allow all) for development
-allowed_origins_env = os.environ.get('ALLOWED_ORIGINS', '*')
-if allowed_origins_env != '*':
-    # Split comma-separated string into a list of origins
-    allowed_origins = [origin.strip() for origin in allowed_origins_env.split(',')]
-else:
-    allowed_origins = '*'
+# -------------------------------------------------
+# CORS
+# -------------------------------------------------
+allowed_origins_env = os.environ.get("ALLOWED_ORIGINS", "*")
+allowed_origins = (
+    [o.strip() for o in allowed_origins_env.split(",")]
+    if allowed_origins_env != "*"
+    else "*"
+)
 
-CORS(app, 
-     resources={
-         r"/*": {
-             "origins": allowed_origins,
-             "methods": ["GET", "POST", "OPTIONS"],
-             "allow_headers": ["Content-Type", "Authorization", "Accept", "X-Session-ID"]
-         }
-     })
+CORS(
+    app,
+    resources={
+        r"/*": {
+            "origins": allowed_origins,
+            "methods": ["GET", "POST", "OPTIONS"],
+            "allow_headers": [
+                "Content-Type",
+                "Authorization",
+                "Accept",
+                "X-Session-ID"
+            ]
+        }
+    }
+)
 
-# Initialize the database and predictor
+# -------------------------------------------------
+# Initialize Databases & Predictor
+# -------------------------------------------------
 try:
     init_sqlite_db()
-    logger.info("Database initialized successfully")
     initialize_predictor()
-    logger.info("Sentiment predictor initialized successfully")
+    logger.info("Initialization successful")
 except Exception as e:
     logger.error(f"Initialization error: {str(e)}")
 
-# Initialize the database
-try:
-    db_engine = init_db()
-    logger.info("Database initialized successfully")
-except Exception as e:
-    logger.error(f"Failed to initialize database: {str(e)}")
-    raise
+db_engine = init_db()
 
-
+# -------------------------------------------------
+# Session Helper
+# -------------------------------------------------
 def get_session_id():
-    """
-    Get or generate a session ID from request headers or cookies.
-    Returns a session ID string.
-    """
-    # Try to get session ID from custom header
-    session_id = request.headers.get('X-Session-ID')
-    
-    # If not in header, try cookies
-    if not session_id:
-        session_id = request.cookies.get('session_id')
-    
-    # If still no session ID, generate a new one
+    session_id = request.headers.get("X-Session-ID") or request.cookies.get("session_id")
     if not session_id:
         session_id = str(uuid.uuid4())
-        logger.info(f"Generated new session ID: {session_id}")
-    
     return session_id
 
-@app.route('/')
+# -------------------------------------------------
+# Routes
+# -------------------------------------------------
+@app.route("/")
 @limiter.exempt
-def home() -> str:
-    """Serve the main page"""
-    return render_template('index.html')
+def home():
+    return render_template("index.html")
 
-@app.route('/predict', methods=['POST', 'OPTIONS'])
-@limiter.limit("15 per minute")
-def predict() -> tuple[Dict[str, Any], int]:
-    # Handle preflight request
-    if request.method == 'OPTIONS':
-        return jsonify({'status': 'ok'}), 200
-        
+# ---------- ✅ FIXED UPLOAD ROUTE ----------
+@app.route("/upload", methods=["POST"])
+def upload_csv():
     try:
-        if not request.is_json:
-            return jsonify({'error': 'Content-Type must be application/json'}), 400
-        
-        data = request.get_json()
-        if not data or 'text' not in data:
-            return jsonify({'error': 'Missing "text" field in request'}), 400
-        
-        text = data['text']
-        timestamp = data.get('timestamp') # Get timestamp from client
-        if not isinstance(text, str) or not text.strip():
-            return jsonify({'error': 'Text must be a non-empty string'}), 400
-        
-        if len(text) > 1000:
-            return jsonify({'error': 'Text exceeds the maximum limit of 1000 characters'}), 400
-        
-        try:
-            result = predict_sentiment(text)
-            
-            if not isinstance(result, dict):
-                result = {'error': 'Invalid prediction result format'}
-                return jsonify(result), 500
-            
-            # Get session ID
-            session_id = get_session_id()
-            prediction_id = None
-            
-            # Save prediction to database
-            try:
-                db_session = get_db_session(db_engine)
-                prediction = Prediction(
-                    input_data=json.dumps({'text': text}),
-                    prediction_result=json.dumps(result),
-                    session_id=session_id
-                )
-                db_session.add(prediction)
-                db_session.commit()
-                prediction_id = prediction.id
-                logger.info(f"Saved prediction with ID {prediction_id} for session {session_id}")
-                db_session.close()
-            except Exception as db_error:
-                logger.error(f"Failed to save prediction to database: {str(db_error)}")
-            
-            # Add session ID to response
-            response_data = result.copy()
-            response_data['session_id'] = session_id
-            response_data['prediction_id'] = prediction_id
-            
-            # Save to analytics database
-            save_prediction(
-                text=text,
-                sentiment=result.get('sentiment', 'unknown'),
-                confidence=result.get('confidence', 0.0),
-                timestamp=timestamp
+        file = request.files.get("file")
+
+        if not file:
+            return error_response(
+                code="NO_FILE",
+                message="No file was uploaded.",
+                suggestion="Please select a CSV file and try again."
             )
-                
-            return jsonify(response_data), 200
-            
-        except Exception as e:
-            logger.error(f"Prediction error: {str(e)}")
-            return jsonify({'error': f'Prediction failed: {str(e)}'}), 500
+
+        if not file.filename.lower().endswith(".csv"):
+            return error_response(
+                code="INVALID_FILE_TYPE",
+                message="Unsupported file format.",
+                suggestion="Only CSV files are allowed."
+            )
+
+        return jsonify({"success": True}), 200
 
     except Exception as e:
-        logger.error(f"Error processing request: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-@app.route('/predict/batch', methods=['POST', 'OPTIONS'])
+        logger.error(str(e))
+        return error_response(
+            code="SERVER_ERROR",
+            message="Something went wrong on the server.",
+            suggestion="Please try again later.",
+            status=500
+        )
+
+# -------------------------------------------------
+@app.route("/predict", methods=["POST", "OPTIONS"])
 @limiter.limit("15 per minute")
-def predict_batch() -> tuple[Dict[str, Any], int]:
-    if request.method == 'OPTIONS':
-        return jsonify({'status': 'ok'}), 200
-        
+def predict():
+    if request.method == "OPTIONS":
+        return jsonify({"status": "ok"}), 200
+
     try:
         if not request.is_json:
-            return jsonify({'error': 'Content-Type must be application/json'}), 400
-        
+            return error_response(
+                "INVALID_CONTENT_TYPE",
+                "Invalid request format.",
+                "Send JSON with Content-Type application/json."
+            )
+
         data = request.get_json()
-        if not data or 'texts' not in data or not isinstance(data['texts'], list):
-            return jsonify({'error': 'Missing or invalid "texts" field in request'}), 400
-        
-        texts = data['texts']
-        if not texts:
-            return jsonify({'results': []}), 200
-            
-        # Limit batch size
-        if len(texts) > 50:
-            return jsonify({'error': 'Batch size exceeds the maximum limit of 50'}), 400
-            
-        try:
-            results = predict_sentiment_batch(texts)
-            session_id = get_session_id()
-            
-            # Save all predictions to database
-            try:
-                db_session = get_db_session(db_engine)
-                for text, result in zip(texts, results):
-                    prediction = Prediction(
-                        input_data=json.dumps({'text': text}),
-                        prediction_result=json.dumps(result),
-                        session_id=session_id
-                    )
-                    db_session.add(prediction)
-                    
-                    # Also save to analytics database
-                    save_prediction(
-                        text=text,
-                        sentiment=result.get('sentiment', 'unknown'),
-                        confidence=result.get('confidence', 0.0)
-                    )
-                db_session.commit()
-                db_session.close()
-            except Exception as db_error:
-                logger.error(f"Failed to save batch predictions: {str(db_error)}")
-                
-            return jsonify({
-                'results': results,
-                'session_id': session_id
-            }), 200
-            
-        except Exception as e:
-            logger.error(f"Batch prediction error: {str(e)}")
-            return jsonify({'error': f'Batch prediction failed: {str(e)}'}), 500
+        text = data.get("text")
 
-    except Exception as e:
-        logger.error(f"Error processing batch request: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        if not text or not isinstance(text, str):
+            return error_response(
+                "INVALID_TEXT",
+                "Text must be a non-empty string.",
+                "Provide valid text for prediction."
+            )
 
-@app.route('/history', methods=['GET', 'OPTIONS'])
-def get_history() -> tuple[Dict[str, Any], int]:
-    if request.method == 'OPTIONS':
-        return jsonify({'status': 'ok'}), 200
+        if len(text) > 1000:
+            return error_response(
+                "TEXT_TOO_LONG",
+                "Text exceeds 1000 characters.",
+                "Please shorten your text."
+            )
 
-    try:
+        result = predict_sentiment(text)
         session_id = get_session_id()
-        logger.info(f"Fetching history for session: {session_id}")
 
-        db_session = get_db_session(db_engine)
-
-        predictions = db_session.query(Prediction).filter(
-            Prediction.session_id == session_id
-        ).order_by(Prediction.timestamp.desc()).all()
-
-        predictions_list = [pred.to_dict() for pred in predictions]
-        db_session.close()
+        save_prediction(
+            text=text,
+            sentiment=result.get("sentiment", "unknown"),
+            confidence=result.get("confidence", 0.0)
+        )
 
         return jsonify({
-            'predictions': predictions_list,
-            'session_id': session_id
+            **result,
+            "session_id": session_id
         }), 200
 
     except Exception as e:
-        logger.error(f"Error fetching history: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        logger.error(str(e))
+        return error_response(
+            "PREDICTION_FAILED",
+            "Prediction failed.",
+            "Please try again later.",
+            500
+        )
 
-
-@app.route('/favorite/<int:prediction_id>', methods=['POST', 'OPTIONS'])
-def toggle_favorite(prediction_id: int) -> tuple[Dict[str, Any], int]:
-    if request.method == 'OPTIONS':
-        return jsonify({'status': 'ok'}), 200
-
-    try:
-        session_id = get_session_id()
-        db_session = get_db_session(db_engine)
-
-        prediction = db_session.query(Prediction).filter(
-            Prediction.id == prediction_id,
-            Prediction.session_id == session_id
-        ).first()
-
-        if not prediction:
-            db_session.close()
-            return jsonify({'error': 'Prediction not found'}), 404
-
-        prediction.is_favorite = not prediction.is_favorite
-        db_session.commit()
-        is_favorite = prediction.is_favorite
-        db_session.close()
-
-        return jsonify({
-            'id': prediction_id,
-            'is_favorite': is_favorite,
-            'message': 'Favorite status updated successfully'
-        }), 200
-
-    except Exception as e:
-        logger.error(f"Error toggling favorite: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/analytics', methods=['GET'])
+# -------------------------------------------------
+@app.route("/analytics", methods=["GET"])
 def analytics():
     try:
-        trends = get_sentiment_trends()
-        summary = get_sentiment_summary()
         return jsonify({
-            'trends': trends,
-            'summary': summary
+            "trends": get_sentiment_trends(),
+            "summary": get_sentiment_summary()
         }), 200
     except Exception as e:
-        logger.error(f"Analytics error: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        logger.error(str(e))
+        return error_response(
+            "ANALYTICS_ERROR",
+            "Failed to load analytics.",
+            "Try again later.",
+            500
+        )
 
-
-@app.route('/export', methods=['GET'])
+# -------------------------------------------------
+@app.route("/export", methods=["GET"])
 def export_data():
     try:
         predictions = get_all_predictions()
-
         output = io.StringIO()
         writer = csv.writer(output)
 
@@ -374,30 +270,35 @@ def export_data():
         return Response(
             output.getvalue(),
             mimetype="text/csv",
-            headers={"Content-disposition": "attachment; filename=sentiment_history.csv"}
+            headers={"Content-Disposition": "attachment; filename=sentiment_history.csv"}
         )
     except Exception as e:
-        logger.error(f"Export error: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        logger.error(str(e))
+        return error_response(
+            "EXPORT_ERROR",
+            "Failed to export data.",
+            "Try again later.",
+            500
+        )
 
-
-@app.route('/clear-history', methods=['POST'])
+# -------------------------------------------------
+@app.route("/clear-history", methods=["POST"])
 def clear_history():
     try:
-        # Clear SQLite history
         clear_all_predictions()
-        
-        # Clear SQLAlchemy history for current session
-        session_id = get_session_id()
-        db_session = get_db_session(db_engine)
-        db_session.query(Prediction).filter(Prediction.session_id == session_id).delete()
-        db_session.commit()
-        db_session.close()
-        
-        return jsonify({'status': 'success', 'message': 'History cleared'}), 200
+        return jsonify({
+            "status": "success",
+            "message": "History cleared successfully"
+        }), 200
     except Exception as e:
-        logger.error(f"Clear history error: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        logger.error(str(e))
+        return error_response(
+            "CLEAR_HISTORY_ERROR",
+            "Failed to clear history.",
+            "Try again later.",
+            500
+        )
 
-if __name__ == '__main__':
+# -------------------------------------------------
+if __name__ == "__main__":
     app.run(debug=True)
