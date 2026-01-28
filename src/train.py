@@ -120,29 +120,50 @@ def create_and_train_model():
             # Save best model
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
-                model.save(os.path.join(project_root, 'models', 'lstm_model.pth'))
-                preprocessor.save(os.path.join(project_root, 'models', 'preprocessor.pkl'))
+                
+                # Create temporary paths for the best model of this run
+                temp_model_path = os.path.join(project_root, 'models', 'temp_best_model.pth')
+                temp_preproc_path = os.path.join(project_root, 'models', 'temp_preprocessor.pkl')
+                
+                model.save(temp_model_path)
+                preprocessor.save(temp_preproc_path)
+                
                 # Save metadata
-                metadata = {
-                    "version": "2.0",
-                    "training_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                metrics = {
                     "val_accuracy": round(val_acc, 4),
-                    "val_loss": round(val_loss, 4)
+                    "val_loss": round(val_loss, 4),
+                    "training_loss": round(avg_loss, 4)
                 }
-                with open(os.path.join(project_root, 'models', 'metadata.json'), 'w') as f:
-                    json.dump(metadata, f)
     
-    # Load best model for evaluation
-    best_model_path = os.path.join(project_root, 'models', 'lstm_model.pth')
-    if os.path.exists(best_model_path):
+    # Register the best model
+    from src.registry import ModelRegistry
+    
+    print("\nRegistering best model...")
+    temp_model_path = os.path.join(project_root, 'models', 'temp_best_model.pth')
+    temp_preproc_path = os.path.join(project_root, 'models', 'temp_preprocessor.pkl')
+    
+    if os.path.exists(temp_model_path):
+        registry = ModelRegistry()
+        new_version = registry.register_model(
+            model_path=temp_model_path,
+            preprocessor_path=temp_preproc_path,
+            metrics=metrics,
+            status="staging" # New models go to staging by default
+        )
+        print(f"Model registered successfully: {new_version.version} (Status: staging)")
+        
+        # Cleanup temp files
+        os.remove(temp_model_path)
+        os.remove(temp_preproc_path)
+        
+        # Load best model for evaluation
         try:
-            # Use the load class method we defined in SentimentLSTM
-            model = SentimentLSTM.load(best_model_path)
-            print("Loaded best model for evaluation.")
+            model = SentimentLSTM.load(new_version.model_path)
+            print("Loaded registered model for evaluation.")
         except Exception as e:
-            print(f"Error loading best model: {e}")
-            # Fallback to current model state
-            pass
+            print(f"Error loading registered model: {e}")
+    else:
+        print("No model was saved during training (loss did not improve).")
     model.eval()
     
     # Test the model
