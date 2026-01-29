@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multilingual Sentiment Analysis</title>
+    <title>Sentiment Analysis - Multi-Language Support</title>
     <style>
         * {
             margin: 0;
@@ -15,110 +15,99 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
             padding: 20px;
         }
 
         .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card {
             background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            padding: 40px;
-            max-width: 800px;
-            width: 100%;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
             animation: fadeIn 0.5s ease-in;
         }
 
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-20px); }
+            from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
-        h1 {
+        .card h2 {
             color: #2d3748;
-            text-align: center;
-            margin-bottom: 10px;
-            font-size: 2.5em;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            margin-bottom: 20px;
+            font-size: 1.5em;
         }
 
-        .subtitle {
-            text-align: center;
-            color: #718096;
-            margin-bottom: 30px;
-            font-size: 1.1em;
-        }
-
+        /* Language Selector */
         .language-selector {
-            margin-bottom: 25px;
-        }
-
-        .language-selector label {
-            display: block;
-            color: #4a5568;
-            font-weight: 600;
-            margin-bottom: 10px;
-            font-size: 0.95em;
+            margin-bottom: 20px;
         }
 
         .language-options {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
             gap: 10px;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
         }
 
         .language-btn {
-            padding: 12px 20px;
+            padding: 10px;
             border: 2px solid #e2e8f0;
             background: white;
-            border-radius: 10px;
+            border-radius: 8px;
             cursor: pointer;
             transition: all 0.3s ease;
-            font-size: 0.95em;
-            font-weight: 500;
-            color: #4a5568;
+            font-size: 0.85em;
             display: flex;
+            flex-direction: column;
             align-items: center;
-            justify-content: center;
-            gap: 8px;
+            gap: 5px;
         }
 
         .language-btn:hover {
             border-color: #667eea;
             background: #f7fafc;
-            transform: translateY(-2px);
         }
 
         .language-btn.active {
             border-color: #667eea;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
         }
 
         .language-btn .flag {
-            font-size: 1.3em;
+            font-size: 1.5em;
         }
 
-        .auto-detect-info {
-            background: #edf2f7;
-            padding: 10px 15px;
-            border-radius: 8px;
-            font-size: 0.85em;
-            color: #4a5568;
-            display: none;
-        }
-
-        .auto-detect-info.active {
-            display: block;
-        }
-
+        /* Form Elements */
         .form-group {
             margin-bottom: 20px;
         }
@@ -128,7 +117,6 @@
             color: #4a5568;
             font-weight: 600;
             margin-bottom: 10px;
-            font-size: 0.95em;
         }
 
         textarea {
@@ -139,7 +127,7 @@
             font-size: 1em;
             font-family: inherit;
             resize: vertical;
-            min-height: 120px;
+            min-height: 100px;
             transition: all 0.3s ease;
         }
 
@@ -156,15 +144,15 @@
             margin-top: 5px;
         }
 
+        /* Buttons */
         .button-group {
             display: flex;
             gap: 10px;
-            margin-top: 20px;
         }
 
         button {
             flex: 1;
-            padding: 15px 30px;
+            padding: 15px 25px;
             border: none;
             border-radius: 10px;
             font-size: 1em;
@@ -173,61 +161,54 @@
             transition: all 0.3s ease;
         }
 
-        .analyze-btn {
+        .btn-primary {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
         }
 
-        .analyze-btn:hover {
+        .btn-primary:hover {
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
         }
 
-        .analyze-btn:active {
-            transform: translateY(0);
-        }
-
-        .analyze-btn:disabled {
+        .btn-primary:disabled {
             opacity: 0.6;
             cursor: not-allowed;
             transform: none;
         }
 
-        .clear-btn {
+        .btn-secondary {
             background: #f7fafc;
             color: #4a5568;
             border: 2px solid #e2e8f0;
         }
 
-        .clear-btn:hover {
+        .btn-secondary:hover {
             background: #edf2f7;
         }
 
+        /* Results */
         .result-container {
-            margin-top: 30px;
-            padding: 25px;
-            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
-            border-radius: 15px;
             display: none;
-            animation: slideIn 0.4s ease-out;
-        }
-
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
+            margin-top: 20px;
         }
 
         .result-container.show {
             display: block;
+            animation: slideIn 0.4s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .sentiment-badge {
             display: inline-block;
             padding: 10px 20px;
-            border-radius: 25px;
+            border-radius: 20px;
             font-weight: 600;
-            font-size: 1.1em;
             margin-bottom: 15px;
         }
 
@@ -241,13 +222,18 @@
             color: white;
         }
 
+        .sentiment-neutral {
+            background: linear-gradient(135deg, #ecc94b 0%, #d69e2e 100%);
+            color: white;
+        }
+
         .confidence-bar {
             width: 100%;
-            height: 30px;
+            height: 25px;
             background: #e2e8f0;
-            border-radius: 15px;
+            border-radius: 12px;
             overflow: hidden;
-            margin: 15px 0;
+            margin: 10px 0;
         }
 
         .confidence-fill {
@@ -257,18 +243,17 @@
             display: flex;
             align-items: center;
             justify-content: flex-end;
-            padding-right: 15px;
+            padding-right: 10px;
             color: white;
             font-weight: 600;
-            font-size: 0.9em;
+            font-size: 0.85em;
         }
 
         .metadata {
-            margin-top: 20px;
+            background: #f7fafc;
             padding: 15px;
-            background: white;
             border-radius: 10px;
-            border-left: 4px solid #667eea;
+            margin-top: 15px;
         }
 
         .metadata-item {
@@ -282,22 +267,71 @@
             border-bottom: none;
         }
 
-        .metadata-label {
-            color: #718096;
-            font-size: 0.9em;
+        /* History & Analytics */
+        .history-section {
+            grid-column: 1 / -1;
         }
 
-        .metadata-value {
-            color: #2d3748;
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
             font-weight: 600;
-            font-size: 0.9em;
+            color: #718096;
+            transition: all 0.3s ease;
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .history-item {
+            background: #f7fafc;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .history-text {
+            color: #2d3748;
+            margin-bottom: 8px;
+        }
+
+        .history-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85em;
+            color: #718096;
+        }
+
+        .chart-container {
+            margin-top: 20px;
+            height: 300px;
         }
 
         .loading {
             display: none;
             text-align: center;
-            color: #667eea;
-            margin-top: 20px;
+            padding: 20px;
         }
 
         .loading.show {
@@ -319,17 +353,20 @@
             100% { transform: rotate(360deg); }
         }
 
-        @media (max-width: 600px) {
-            .container {
-                padding: 25px;
-            }
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #718096;
+        }
 
-            h1 {
-                font-size: 2em;
+        /* Responsive */
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
             }
 
             .language-options {
-                grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+                grid-template-columns: repeat(3, 1fr);
             }
 
             .button-group {
@@ -340,208 +377,224 @@
 </head>
 <body>
     <div class="container">
-        <h1>🌍 Multilingual Sentiment Analysis</h1>
-        <p class="subtitle">Analyze sentiment in multiple languages with AI</p>
+        <div class="header">
+            <h1>🌍 Sentiment Analysis</h1>
+            <p>Advanced Multi-Language Text Sentiment Analysis</p>
+        </div>
 
-        <div class="language-selector">
-            <label>Select Language</label>
-            <div class="language-options">
-                <button type="button" class="language-btn active" data-lang="auto">
-                    <span class="flag">🌐</span>
-                    <span>Auto-Detect</span>
-                </button>
-                <button type="button" class="language-btn" data-lang="en">
-                    <span class="flag">🇬🇧</span>
-                    <span>English</span>
-                </button>
-                <button type="button" class="language-btn" data-lang="es">
-                    <span class="flag">🇪🇸</span>
-                    <span>Spanish</span>
-                </button>
-                <button type="button" class="language-btn" data-lang="fr">
-                    <span class="flag">🇫🇷</span>
-                    <span>French</span>
-                </button>
-                <button type="button" class="language-btn" data-lang="de">
-                    <span class="flag">🇩🇪</span>
-                    <span>German</span>
-                </button>
-                <button type="button" class="language-btn" data-lang="hi">
-                    <span class="flag">🇮🇳</span>
-                    <span>Hindi</span>
-                </button>
-            </div>
-            <div class="auto-detect-info active">
-                ℹ️ Language will be automatically detected from your text
-            <p class="subtitle">Advanced Text Sentiment Analysis (Positive, Neutral, Negative)</p>
-        </header>
-
-        <main class="main-layout">
-            <div class="content-grid">
-                <!-- Left Column: Input -->
-                <section class="input-section glass-card">
-                    <form id="sentimentForm">
-                        <div class="form-header">
-                            <label for="text">Analysis Input</label>
-                            <div class="char-counter" id="charCounter">0 / 500</div>
-                        </div>
-                        
-                        <div class="input-container">
-                            <textarea
-                                id="text"
-                                name="text"
-                                required
-                                placeholder="Paste your text here to analyze emotions..."
-                                maxlength="500"
-                                rows="5"
-                            ></textarea>
-                            <button type="button" class="clear-btn" id="clearButton" title="Clear">×</button>
-                        </div>
-
-                        <div class="action-area">
-                            <p class="hint">Hit <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to analyze</p>
-                            <button type="submit" id="submitBtn">
-                                <span>Analyze Text</span>
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
-                                </svg>
-                            </button>
-                        </div>
-                    </form>
-                </section>
-
-                <!-- Right Column: Result -->
-                <section class="result-section glass-card" id="resultSection">
-                    <div class="placeholder-content">
-                        <div class="pulse-circle">🔍</div>
-                        <h3>Ready to Analyze</h3>
-                        <p>Your results will appear here with detailed confidence scoring.</p>
+        <div class="main-content">
+            <!-- Input Section -->
+            <div class="card">
+                <h2>Analyze Text</h2>
+                
+                <!-- Language Selector -->
+                <div class="language-selector">
+                    <label>Select Language</label>
+                    <div class="language-options">
+                        <button type="button" class="language-btn active" data-lang="auto">
+                            <span class="flag">🌐</span>
+                            <span>Auto</span>
+                        </button>
+                        <button type="button" class="language-btn" data-lang="en">
+                            <span class="flag">🇬🇧</span>
+                            <span>EN</span>
+                        </button>
+                        <button type="button" class="language-btn" data-lang="es">
+                            <span class="flag">🇪🇸</span>
+                            <span>ES</span>
+                        </button>
+                        <button type="button" class="language-btn" data-lang="fr">
+                            <span class="flag">🇫🇷</span>
+                            <span>FR</span>
+                        </button>
+                        <button type="button" class="language-btn" data-lang="de">
+                            <span class="flag">🇩🇪</span>
+                            <span>DE</span>
+                        </button>
+                        <button type="button" class="language-btn" data-lang="hi">
+                            <span class="flag">🇮🇳</span>
+                            <span>HI</span>
+                        </button>
                     </div>
-                </section>
+                </div>
+
+                <form id="sentimentForm">
+                    <div class="form-group">
+                        <label for="textInput">Enter your text</label>
+                        <textarea 
+                            id="textInput" 
+                            name="text" 
+                            placeholder="Type or paste your text here..."
+                            required
+                            maxlength="1000"
+                        ></textarea>
+                        <div class="char-counter">
+                            <span id="charCount">0</span> / 1000 characters
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button type="submit" class="btn-primary" id="analyzeBtn">
+                            Analyze Sentiment
+                        </button>
+                        <button type="button" class="btn-secondary" id="clearBtn">
+                            Clear
+                        </button>
+                    </div>
+                </form>
+
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <p>Analyzing...</p>
+                </div>
+            </div>
+
+            <!-- Results Section -->
+            <div class="card">
+                <h2>Results</h2>
+                <div class="result-container" id="resultContainer">
+                    <div class="sentiment-badge" id="sentimentBadge"></div>
+                    <div>
+                        <strong>Confidence:</strong>
+                        <div class="confidence-bar">
+                            <div class="confidence-fill" id="confidenceFill">0%</div>
+                        </div>
+                    </div>
+                    <div class="metadata">
+                        <div class="metadata-item">
+                            <span>Language:</span>
+                            <span id="detectedLang">-</span>
+                        </div>
+                        <div class="metadata-item">
+                            <span>Raw Score:</span>
+                            <span id="rawScore">-</span>
+                        </div>
+                        <div class="metadata-item">
+                            <span>Inference Time:</span>
+                            <span id="inferenceTime">-</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="empty-state" id="emptyState">
+                    <p>📊</p>
+                    <p>Enter text and click "Analyze Sentiment" to see results</p>
+                </div>
             </div>
         </div>
 
-        <form id="sentimentForm">
-            <div class="form-group">
-                <label for="textInput">Enter your text</label>
-                <textarea 
-                    id="textInput" 
-                    name="text" 
-                    placeholder="Type or paste your text here... (e.g., 'This is amazing!' or 'J'adore ce produit!')"
-                    required
-                    maxlength="5000"
-                ></textarea>
-                <div class="char-counter">
-                    <span id="charCount">0</span> / 5000 characters
+        <!-- History & Analytics Section -->
+        <div class="card history-section">
+            <div class="tabs">
+                <button class="tab active" data-tab="history">History</button>
+                <button class="tab" data-tab="analytics">Analytics</button>
+            </div>
+
+            <div class="tab-content active" id="history-tab">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+                    <h3>Recent Predictions</h3>
+                    <button class="btn-secondary" id="clearHistoryBtn" style="padding: 8px 16px;">
+                        Clear History
+                    </button>
+                </div>
+                <div id="historyContainer">
+                    <div class="empty-state">
+                        <p>No predictions yet</p>
+                    </div>
                 </div>
             </div>
 
-            <div class="button-group">
-                <button type="submit" class="analyze-btn" id="analyzeBtn">
-                    Analyze Sentiment
-                </button>
-                <button type="button" class="clear-btn" id="clearBtn">
-                    Clear
-                </button>
-            </div>
-        </form>
-
-        <div class="loading" id="loading">
-            <div class="spinner"></div>
-            <p>Analyzing sentiment...</p>
-        </div>
-
-        <div class="result-container" id="resultContainer">
-            <div class="sentiment-badge" id="sentimentBadge"></div>
-            <div>
-                <strong>Confidence Level:</strong>
-                <div class="confidence-bar">
-                    <div class="confidence-fill" id="confidenceFill">0%</div>
+            <div class="tab-content" id="analytics-tab">
+                <h3>Sentiment Trends</h3>
+                <div class="chart-container">
+                    <canvas id="sentimentChart"></canvas>
                 </div>
-            </div>
-            <div class="metadata">
-                <div class="metadata-item">
-                    <span class="metadata-label">Detected Language:</span>
-                    <span class="metadata-value" id="detectedLang">-</span>
-                </div>
-                <div class="metadata-item">
-                    <span class="metadata-label">Raw Score:</span>
-                    <span class="metadata-value" id="rawScore">-</span>
-                </div>
-                <div class="metadata-item">
-                    <span class="metadata-label">Inference Time:</span>
-                    <span class="metadata-value" id="inferenceTime">-</span>
-                </div>
-                <div class="metadata-item">
-                    <span class="metadata-label">Model Version:</span>
-                    <span class="metadata-value" id="modelVersion">-</span>
-                </div>
+                <div id="analyticsStats" style="margin-top: 20px;"></div>
             </div>
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
-        const form = document.getElementById('sentimentForm');
-        const textInput = document.getElementById('textInput');
-        const charCount = document.getElementById('charCount');
-        const analyzeBtn = document.getElementById('analyzeBtn');
-        const clearBtn = document.getElementById('clearBtn');
-        const loading = document.getElementById('loading');
-        const resultContainer = document.getElementById('resultContainer');
-        const languageBtns = document.querySelectorAll('.language-btn');
-        const autoDetectInfo = document.querySelector('.auto-detect-info');
-        
+        // State
         let selectedLanguage = 'auto';
+        let sessionId = localStorage.getItem('sessionId') || generateSessionId();
+        let sentimentChart = null;
 
-        // Language selection
-        languageBtns.forEach(btn => {
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadHistory();
+            loadAnalytics();
+        });
+
+        function generateSessionId() {
+            const id = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            localStorage.setItem('sessionId', id);
+            return id;
+        }
+
+        // Language Selection
+        document.querySelectorAll('.language-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                languageBtns.forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.language-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 selectedLanguage = btn.dataset.lang;
-                
-                if (selectedLanguage === 'auto') {
-                    autoDetectInfo.classList.add('active');
-                } else {
-                    autoDetectInfo.classList.remove('active');
-                }
             });
         });
 
-        // Character counter
+        // Character Counter
+        const textInput = document.getElementById('textInput');
+        const charCount = document.getElementById('charCount');
+
         textInput.addEventListener('input', () => {
             charCount.textContent = textInput.value.length;
         });
 
-        // Clear button
-        clearBtn.addEventListener('click', () => {
+        // Clear Button
+        document.getElementById('clearBtn').addEventListener('click', () => {
             textInput.value = '';
             charCount.textContent = '0';
-            resultContainer.classList.remove('show');
+            document.getElementById('resultContainer').classList.remove('show');
+            document.getElementById('emptyState').style.display = 'block';
         });
 
-        // Form submission
-        form.addEventListener('submit', async (e) => {
+        // Form Submission
+        document.getElementById('sentimentForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
             const text = textInput.value.trim();
             if (!text) return;
 
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            const loading = document.getElementById('loading');
+            const resultContainer = document.getElementById('resultContainer');
+            const emptyState = document.getElementById('emptyState');
+
             // Show loading
             loading.classList.add('show');
             resultContainer.classList.remove('show');
+            emptyState.style.display = 'none';
             analyzeBtn.disabled = true;
 
             try {
-                const requestData = { text };
+                const requestData = { 
+                    text,
+                    timestamp: new Date().toISOString()
+                };
+
+                // Use multilingual endpoint if language is specified and not English
+                const endpoint = (selectedLanguage !== 'auto' && selectedLanguage !== 'en') 
+                    ? '/predict/multilingual' 
+                    : '/predict';
+                
                 if (selectedLanguage !== 'auto') {
                     requestData.language = selectedLanguage;
                 }
 
-                const response = await fetch('/predict/multilingual', {
+                const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'X-Session-ID': sessionId
                     },
                     body: JSON.stringify(requestData)
                 });
@@ -552,8 +605,16 @@
 
                 const data = await response.json();
                 displayResult(data);
+                
+                // Reload history and analytics
+                setTimeout(() => {
+                    loadHistory();
+                    loadAnalytics();
+                }, 500);
+
             } catch (error) {
                 alert('Error: ' + error.message);
+                emptyState.style.display = 'block';
             } finally {
                 loading.classList.remove('show');
                 analyzeBtn.disabled = false;
@@ -561,18 +622,22 @@
         });
 
         function displayResult(data) {
-            // Sentiment badge
+            const resultContainer = document.getElementById('resultContainer');
+            const emptyState = document.getElementById('emptyState');
+            
+            // Sentiment Badge
             const sentimentBadge = document.getElementById('sentimentBadge');
-            sentimentBadge.textContent = data.sentiment;
-            sentimentBadge.className = 'sentiment-badge sentiment-' + data.sentiment.toLowerCase();
+            const sentiment = data.sentiment || 'Unknown';
+            sentimentBadge.textContent = sentiment;
+            sentimentBadge.className = 'sentiment-badge sentiment-' + sentiment.toLowerCase();
 
-            // Confidence bar
+            // Confidence Bar
             const confidenceFill = document.getElementById('confidenceFill');
-            const confidencePercent = (data.confidence * 100).toFixed(1);
-            confidenceFill.style.width = confidencePercent + '%';
-            confidenceFill.textContent = confidencePercent + '%';
+            const confidence = (data.confidence * 100).toFixed(1);
+            confidenceFill.style.width = confidence + '%';
+            confidenceFill.textContent = confidence + '%';
 
-            // Language mapping
+            // Metadata
             const langNames = {
                 'en': '🇬🇧 English',
                 'es': '🇪🇸 Spanish',
@@ -581,26 +646,219 @@
                 'hi': '🇮🇳 Hindi'
             };
 
-            // Metadata
-            document.getElementById('detectedLang').textContent = langNames[data.language] || data.language;
-            document.getElementById('rawScore').textContent = data.raw_score.toFixed(4);
-            document.getElementById('inferenceTime').textContent = data.inference_time_ms.toFixed(2) + ' ms';
-            document.getElementById('modelVersion').textContent = data.model_info?.version || 'Unknown';
+            document.getElementById('detectedLang').textContent = 
+                langNames[data.language] || data.language || 'English';
+            
+            const rawScore = data.raw_score || data.raw_scores?.[0] || 0;
+            document.getElementById('rawScore').textContent = 
+                typeof rawScore === 'number' ? rawScore.toFixed(4) : rawScore;
+            
+            document.getElementById('inferenceTime').textContent = 
+                data.inference_time_ms ? data.inference_time_ms.toFixed(2) + ' ms' : 'N/A';
 
-            // Show result
+            // Show results
+            emptyState.style.display = 'none';
             resultContainer.classList.add('show');
+        }
+
+        // Tab Navigation
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = tab.dataset.tab;
+                
+                // Update active tab
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                // Update active content
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                document.getElementById(tabName + '-tab').classList.add('active');
+                
+                if (tabName === 'analytics') {
+                    loadAnalytics();
+                }
+            });
+        });
+
+        // Load History
+        async function loadHistory() {
+            try {
+                const response = await fetch('/history', {
+                    headers: {
+                        'X-Session-ID': sessionId
+                    }
+                });
+                
+                if (!response.ok) return;
+                
+                const data = await response.json();
+                const historyContainer = document.getElementById('historyContainer');
+                
+                if (!data.predictions || data.predictions.length === 0) {
+                    historyContainer.innerHTML = '<div class="empty-state"><p>No predictions yet</p></div>';
+                    return;
+                }
+                
+                historyContainer.innerHTML = data.predictions.slice(0, 10).map(pred => {
+                    const inputData = typeof pred.input_data === 'string' 
+                        ? JSON.parse(pred.input_data) 
+                        : pred.input_data;
+                    const resultData = typeof pred.prediction_result === 'string'
+                        ? JSON.parse(pred.prediction_result)
+                        : pred.prediction_result;
+                    
+                    const text = inputData.text || '';
+                    const sentiment = resultData.sentiment || 'Unknown';
+                    const confidence = ((resultData.confidence || 0) * 100).toFixed(1);
+                    const timestamp = new Date(pred.timestamp).toLocaleString();
+                    
+                    return `
+                        <div class="history-item">
+                            <div class="history-text">${text.substring(0, 100)}${text.length > 100 ? '...' : ''}</div>
+                            <div class="history-meta">
+                                <span class="sentiment-badge sentiment-${sentiment.toLowerCase()}" style="padding: 4px 12px; font-size: 0.85em;">
+                                    ${sentiment} (${confidence}%)
+                                </span>
+                                <span>${timestamp}</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+            } catch (error) {
+                console.error('Error loading history:', error);
+            }
+        }
+
+        // Clear History
+        document.getElementById('clearHistoryBtn').addEventListener('click', async () => {
+            if (!confirm('Are you sure you want to clear all history?')) return;
+            
+            try {
+                await fetch('/clear-history', {
+                    method: 'POST',
+                    headers: {
+                        'X-Session-ID': sessionId
+                    }
+                });
+                loadHistory();
+                loadAnalytics();
+            } catch (error) {
+                alert('Error clearing history: ' + error.message);
+            }
+        });
+
+        // Load Analytics
+        async function loadAnalytics() {
+            try {
+                const response = await fetch('/analytics');
+                if (!response.ok) return;
+                
+                const data = await response.json();
+                
+                // Update stats
+                const statsHtml = `
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                        <div style="background: #f7fafc; padding: 15px; border-radius: 10px;">
+                            <div style="font-size: 2em; color: #48bb78;">✓</div>
+                            <div style="font-size: 1.5em; font-weight: bold;">${data.summary.positive || 0}</div>
+                            <div style="color: #718096;">Positive</div>
+                        </div>
+                        <div style="background: #f7fafc; padding: 15px; border-radius: 10px;">
+                            <div style="font-size: 2em; color: #f56565;">✗</div>
+                            <div style="font-size: 1.5em; font-weight: bold;">${data.summary.negative || 0}</div>
+                            <div style="color: #718096;">Negative</div>
+                        </div>
+                        <div style="background: #f7fafc; padding: 15px; border-radius: 10px;">
+                            <div style="font-size: 2em; color: #ecc94b;">●</div>
+                            <div style="font-size: 1.5em; font-weight: bold;">${data.summary.neutral || 0}</div>
+                            <div style="color: #718096;">Neutral</div>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('analyticsStats').innerHTML = statsHtml;
+                
+                // Update chart
+                if (data.trends && data.trends.length > 0) {
+                    updateChart(data.trends);
+                }
+                
+            } catch (error) {
+                console.error('Error loading analytics:', error);
+            }
+        }
+
+        function updateChart(trends) {
+            const ctx = document.getElementById('sentimentChart');
+            if (!ctx) return;
+            
+            // Prepare data
+            const labels = trends.map(t => new Date(t.timestamp).toLocaleDateString());
+            const positiveData = trends.map(t => t.sentiment === 'positive' ? 1 : 0);
+            const negativeData = trends.map(t => t.sentiment === 'negative' ? 1 : 0);
+            const neutralData = trends.map(t => t.sentiment === 'neutral' ? 1 : 0);
+            
+            if (sentimentChart) {
+                sentimentChart.destroy();
+            }
+            
+            sentimentChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Positive',
+                            data: positiveData,
+                            borderColor: '#48bb78',
+                            backgroundColor: 'rgba(72, 187, 120, 0.1)',
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Negative',
+                            data: negativeData,
+                            borderColor: '#f56565',
+                            backgroundColor: 'rgba(245, 101, 101, 0.1)',
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Neutral',
+                            data: neutralData,
+                            borderColor: '#ecc94b',
+                            backgroundColor: 'rgba(236, 201, 75, 0.1)',
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        }
+                    }
+                }
+            });
         }
 
         // Keyboard shortcuts
         textInput.addEventListener('keydown', (e) => {
             if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
                 e.preventDefault();
-                form.dispatchEvent(new Event('submit'));
+                document.getElementById('sentimentForm').dispatchEvent(new Event('submit'));
             }
             if (e.key === 'Escape') {
                 textInput.value = '';
                 charCount.textContent = '0';
-                resultContainer.classList.remove('show');
             }
         });
     </script>
