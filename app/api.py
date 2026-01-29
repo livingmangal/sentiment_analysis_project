@@ -22,6 +22,10 @@ from app.database import (
     clear_all_predictions
 )
 from app.analytics import get_sentiment_trends, get_sentiment_summary
+
+# ✅ NEW: Import new analytics module
+from src.analytics import init_analytics_db, log_request, get_analytics_data
+
 import logging
 from typing import Dict, Any
 import json
@@ -41,21 +45,17 @@ logger = logging.getLogger(__name__)
 basedir = os.path.abspath(os.path.dirname(__file__))
 
 # Initialize Flask
-# Flask will automatically serve files from the 'static' folder found at 'basedir/static'
 app = Flask(__name__, 
     template_folder=os.path.join(basedir, 'templates'),
     static_folder=os.path.join(basedir, 'static')
 )
 
-# Disable caching for static files (helps during development)
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 
 # Configure CORS
-# Get allowed origins from environment variable, default to "*" (allow all) for development
 allowed_origins_env = os.environ.get('ALLOWED_ORIGINS', '*')
 if allowed_origins_env != '*':
-    # Split comma-separated string into a list of origins
     allowed_origins = [origin.strip() for origin in allowed_origins_env.split(',')]
 else:
     allowed_origins = '*'
@@ -65,45 +65,30 @@ CORS(app,
          r"/*": {
              "origins": allowed_origins,
              "methods": ["GET", "POST", "OPTIONS"],
-             "allow_headers": ["Content-Type", "Authorization", "Accept", "X-Session-ID"]
+             "allow_headers": ["Content-Type", "Authorization", "Accept", "X-Session-ID", "X-Admin-Key"]
          }
      })
 
 # Initialize the database and predictor
 try:
     init_sqlite_db()
-    logger.info("Database initialized successfully")
+    init_analytics_db() # ✅ NEW: Initialize analytics DB
+    logger.info("Databases initialized successfully")
     initialize_predictor()
     logger.info("Sentiment predictor initialized successfully")
+    db_engine = init_db()
+    logger.info("Main Database initialized successfully")
 except Exception as e:
     logger.error(f"Initialization error: {str(e)}")
 
-# Initialize the database
-try:
-    db_engine = init_db()
-    logger.info("Database initialized successfully")
-except Exception as e:
-    logger.error(f"Failed to initialize database: {str(e)}")
-    raise
-
-
 def get_session_id():
-    """
-    Get or generate a session ID from request headers or cookies.
-    Returns a session ID string.
-    """
-    # Try to get session ID from custom header
+    """Get or generate a session ID from request headers or cookies."""
     session_id = request.headers.get('X-Session-ID')
-    
-    # If not in header, try cookies
     if not session_id:
         session_id = request.cookies.get('session_id')
-    
-    # If still no session ID, generate a new one
     if not session_id:
         session_id = str(uuid.uuid4())
         logger.info(f"Generated new session ID: {session_id}")
-    
     return session_id
 
 @app.route('/')
@@ -126,7 +111,7 @@ def predict() -> tuple[Dict[str, Any], int]:
             return jsonify({'error': 'Missing "text" field in request'}), 400
         
         text = data['text']
-        timestamp = data.get('timestamp') # Get timestamp from client
+        timestamp = data.get('timestamp') 
         if not isinstance(text, str) or not text.strip():
             return jsonify({'error': 'Text must be a non-empty string'}), 400
         
@@ -140,6 +125,15 @@ def predict() -> tuple[Dict[str, Any], int]:
                 result = {'error': 'Invalid prediction result format'}
                 return jsonify(result), 500
             
+            # ✅ NEW: Log request to analytics DB
+            log_request(
+                text=text,
+                sentiment=result.get('sentiment', 'unknown'),
+                confidence=result.get('confidence', 0.0),
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent', 'unknown')
+            )
+
             # Get session ID
             session_id = get_session_id()
             prediction_id = None
@@ -165,7 +159,7 @@ def predict() -> tuple[Dict[str, Any], int]:
             response_data['session_id'] = session_id
             response_data['prediction_id'] = prediction_id
             
-            # Save to analytics database
+            # Save to existing analytics/history database
             save_prediction(
                 text=text,
                 sentiment=result.get('sentiment', 'unknown'),
@@ -219,7 +213,7 @@ def predict_batch() -> tuple[Dict[str, Any], int]:
                     )
                     db_session.add(prediction)
                     
-                    # Also save to analytics database
+                    # Also save to history database
                     save_prediction(
                         text=text,
                         sentiment=result.get('sentiment', 'unknown'),
@@ -270,7 +264,7 @@ def get_history() -> tuple[Dict[str, Any], int]:
         logger.error(f"Error fetching history: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-
+# ✅ Restored: Favorites endpoint
 @app.route('/favorite/<int:prediction_id>', methods=['POST', 'OPTIONS'])
 def toggle_favorite(prediction_id: int) -> tuple[Dict[str, Any], int]:
     if request.method == 'OPTIONS':
@@ -304,9 +298,22 @@ def toggle_favorite(prediction_id: int) -> tuple[Dict[str, Any], int]:
         logger.error(f"Error toggling favorite: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-
+# ✅ UPDATED: Analytics Endpoint (Now includes Admin Check & new Stats)
 @app.route('/analytics', methods=['GET'])
 def analytics():
+    # 1. Admin Security Check
+    admin_key = request.headers.get('X-Admin-Key')
+    # In production, use os.environ.get('ADMIN_KEY')
+    if admin_key and admin_key == 'secret_admin_key_123':
+        try:
+            # Return the new advanced analytics from src/analytics.py
+            stats = get_analytics_data()
+            return jsonify(stats), 200
+        except Exception as e:
+            logger.error(f"Analytics error: {str(e)}")
+            return jsonify({'error': str(e)}), 500
+    
+    # 2. Public Fallback (Optional - keep existing public trends if needed)
     try:
         trends = get_sentiment_trends()
         summary = get_sentiment_summary()
@@ -318,7 +325,7 @@ def analytics():
         logger.error(f"Analytics error: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-
+# ✅ Restored: Export endpoint
 @app.route('/export', methods=['GET'])
 def export_data():
     try:
@@ -341,7 +348,7 @@ def export_data():
         logger.error(f"Export error: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-
+# ✅ Restored: Clear History endpoint
 @app.route('/clear-history', methods=['POST'])
 def clear_history():
     try:
