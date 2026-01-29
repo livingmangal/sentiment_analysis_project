@@ -120,7 +120,11 @@
 
         <div class="grid">
             <div class="card">
-                <h2>Model Registry</h2>
+                <h2>Model Management</h2>
+                <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                    <button onclick="runFinetune()" id="finetune-btn">Fine-tune on Feedback</button>
+                    <button onclick="runRollback()" class="secondary" id="rollback-btn">Rollback to Previous</button>
+                </div>
                 <div id="models-list">Loading models...</div>
             </div>
 
@@ -215,6 +219,51 @@
                 body: JSON.stringify({ status })
             });
             fetchModels();
+        }
+
+        async function runFinetune() {
+            const btn = document.getElementById('finetune-btn');
+            const originalText = btn.innerText;
+            btn.innerText = 'Fine-tuning...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/admin/api/models/finetune', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    alert(data.message);
+                    fetchModels();
+                } else {
+                    alert(data.message || 'Fine-tuning failed.');
+                }
+            } catch (e) {
+                alert('Error during fine-tuning');
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        async function runRollback() {
+            if (!confirm('Are you sure you want to rollback to the previous model version?')) return;
+
+            const btn = document.getElementById('rollback-btn');
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/admin/api/models/rollback', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    alert(data.message);
+                    fetchModels();
+                } else {
+                    alert(data.error || 'Rollback failed.');
+                }
+            } catch (e) {
+                alert('Error during rollback');
+            } finally {
+                btn.disabled = false;
+            }
         }
 
         function addToExperiment(version) {
