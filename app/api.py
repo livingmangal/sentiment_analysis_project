@@ -47,7 +47,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Configuration
-# Get the directory where this file is located
 basedir = os.path.abspath(os.path.dirname(__file__))
 
 from app.admin_routes import admin_bp
@@ -68,7 +67,6 @@ def get_client_identifier():
     1. X-Session-ID header
     2. session_id cookie
     3. Remote IP address (fallback)
-    This ensures rate limiting is "browser-based" rather than global.
     """
     return request.headers.get('X-Session-ID') or \
            request.cookies.get('session_id') or \
@@ -97,15 +95,13 @@ def ratelimit_handler(e):
         "status": 429
     }), 429
 
-# Disable caching for static files (helps during development)
+# Disable caching for static files
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 
 # Configure CORS
-# Get allowed origins from environment variable, default to "*" (allow all) for development
 allowed_origins_env = os.environ.get('ALLOWED_ORIGINS', '*')
 if allowed_origins_env != '*':
-    # Split comma-separated string into a list of origins
     allowed_origins = [origin.strip() for origin in allowed_origins_env.split(',')]
 else:
     allowed_origins = '*'
@@ -124,15 +120,16 @@ ab_framework = None
 
 try:
     init_sqlite_db()
-    logger.info("Database initialized successfully")
+    logger.info("SQLite database initialized successfully")
     initialize_predictor()
-    logger.info("Sentiment predictor initialized successfully")
+    logger.info("Standard sentiment predictor initialized successfully")
+    
     # Initialize multilingual predictor (models may not exist yet)
     try:
         initialize_multilingual_predictor(auto_detect=True, quantize=True)
         logger.info("Multilingual predictor initialized successfully")
     except Exception as ml_error:
-        logger.warning(f"Multilingual predictor not fully initialized (models may not exist): {str(ml_error)}")
+        logger.warning(f"Multilingual predictor not fully initialized: {str(ml_error)}")
     
     # Initialize AB Testing Framework
     try:
@@ -141,52 +138,45 @@ try:
     except Exception:
         logger.info("Initializing new AB Testing Framework")
         ab_framework = ABTestingFramework("sentiment_v1", strategy=TrafficSplitStrategy.SESSION_HASH)
-        # Use default/latest model if possible, or wait for admin config
-        # Ideally we'd scan the registry for an active model here
         from src.registry import ModelRegistry
         registry = ModelRegistry()
         latest = registry.get_latest_active_model()
         if latest:
-             from src.ab_testing.framework import ModelVariant
-             variant = ModelVariant(
-                 variant_id=latest.version,
-                 model_path=latest.model_path,
-                 preprocessor_path=latest.preprocessor_path,
-                 description="Default active model"
-             )
-             ab_framework.add_variant(variant)
-             ab_framework.save_config()
+            from src.ab_testing.framework import ModelVariant
+            variant = ModelVariant(
+                variant_id=latest.version,
+                model_path=latest.model_path,
+                preprocessor_path=latest.preprocessor_path,
+                description="Default active model"
+            )
+            ab_framework.add_variant(variant)
+            ab_framework.save_config()
 
 except Exception as e:
     logger.error(f"Initialization error: {str(e)}")
 
-# Initialize the database
+# Initialize SQLAlchemy database
 try:
     db_engine = init_db()
-    logger.info("Database initialized successfully")
+    logger.info("SQLAlchemy database initialized successfully")
 except Exception as e:
     logger.error(f"Failed to initialize database: {str(e)}")
     raise
 
 
 def get_session_id():
-    """
-    Get or generate a session ID from request headers or cookies.
-    Returns a session ID string.
-    """
-    # Try to get session ID from custom header
+    """Get or generate a session ID from request headers or cookies."""
     session_id = request.headers.get('X-Session-ID')
     
-    # If not in header, try cookies
     if not session_id:
         session_id = request.cookies.get('session_id')
     
-    # If still no session ID, generate a new one
     if not session_id:
         session_id = str(uuid.uuid4())
         logger.info(f"Generated new session ID: {session_id}")
     
     return session_id
+
 
 @app.route('/')
 @limiter.exempt
@@ -194,10 +184,11 @@ def home() -> str:
     """Serve the main page"""
     return render_template('index.html')
 
+
 @app.route('/predict', methods=['POST', 'OPTIONS'])
 @limiter.limit("15 per minute")
 def predict() -> tuple[Dict[str, Any], int]:
-    # Handle preflight request
+    """Standard prediction endpoint - handles English text primarily"""
     if request.method == 'OPTIONS':
         return jsonify({'status': 'ok'}), 200
         
@@ -210,7 +201,8 @@ def predict() -> tuple[Dict[str, Any], int]:
             return jsonify({'error': 'Missing "text" field in request'}), 400
         
         text = data['text']
-        timestamp = data.get('timestamp') # Get timestamp from client
+        timestamp = data.get('timestamp')
+        
         if not isinstance(text, str) or not text.strip():
             return jsonify({'error': 'Text must be a non-empty string'}), 400
         
@@ -218,15 +210,14 @@ def predict() -> tuple[Dict[str, Any], int]:
             return jsonify({'error': 'Text exceeds the maximum limit of 1000 characters'}), 400
         
         try:
-            # Get session ID early for AB testing
             session_id = get_session_id()
             
+            # Use AB testing framework if configured
             if ab_framework and ab_framework.variants:
                 try:
                     result = ab_framework.predict(text, session_id=session_id)
                 except Exception as e:
                     logger.error(f"AB Framework prediction failed: {e}")
-                    # Fallback
                     result = predict_sentiment(text)
             else:
                 result = predict_sentiment(text)
@@ -237,7 +228,7 @@ def predict() -> tuple[Dict[str, Any], int]:
             
             prediction_id = None
             
-            # Save prediction to database
+            # Save to SQLAlchemy database
             try:
                 db_session = get_db_session(db_engine)
                 prediction = Prediction(
@@ -251,20 +242,23 @@ def predict() -> tuple[Dict[str, Any], int]:
                 logger.info(f"Saved prediction with ID {prediction_id} for session {session_id}")
                 db_session.close()
             except Exception as db_error:
-                logger.error(f"Failed to save prediction to database: {str(db_error)}")
+                logger.error(f"Failed to save prediction to SQLAlchemy database: {str(db_error)}")
+            
+            # Save to SQLite database for analytics
+            try:
+                save_prediction(
+                    text=text,
+                    sentiment=result.get('sentiment', 'unknown'),
+                    confidence=result.get('confidence', 0.0),
+                    timestamp=timestamp
+                )
+            except Exception as sqlite_error:
+                logger.error(f"Failed to save to SQLite database: {str(sqlite_error)}")
             
             # Add session ID to response
             response_data = result.copy()
             response_data['session_id'] = session_id
             response_data['prediction_id'] = prediction_id
-            
-            # Save to analytics database
-            save_prediction(
-                text=text,
-                sentiment=result.get('sentiment', 'unknown'),
-                confidence=result.get('confidence', 0.0),
-                timestamp=timestamp
-            )
                 
             return jsonify(response_data), 200
             
@@ -275,9 +269,12 @@ def predict() -> tuple[Dict[str, Any], int]:
     except Exception as e:
         logger.error(f"Error processing request: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+
 @app.route('/predict/batch', methods=['POST', 'OPTIONS'])
 @limiter.limit("15 per minute")
 def predict_batch() -> tuple[Dict[str, Any], int]:
+    """Batch prediction endpoint"""
     if request.method == 'OPTIONS':
         return jsonify({'status': 'ok'}), 200
         
@@ -293,7 +290,6 @@ def predict_batch() -> tuple[Dict[str, Any], int]:
         if not texts:
             return jsonify({'results': []}), 200
             
-        # Limit batch size
         if len(texts) > 50:
             return jsonify({'error': 'Batch size exceeds the maximum limit of 50'}), 400
             
@@ -309,7 +305,7 @@ def predict_batch() -> tuple[Dict[str, Any], int]:
             else:
                 results = predict_sentiment_batch(texts)
             
-            # Save all predictions to database
+            # Save all predictions
             try:
                 db_session = get_db_session(db_engine)
                 for text, result in zip(texts, results):
@@ -321,11 +317,15 @@ def predict_batch() -> tuple[Dict[str, Any], int]:
                     db_session.add(prediction)
                     
                     # Also save to analytics database
-                    save_prediction(
-                        text=text,
-                        sentiment=result.get('sentiment', 'unknown'),
-                        confidence=result.get('confidence', 0.0)
-                    )
+                    try:
+                        save_prediction(
+                            text=text,
+                            sentiment=result.get('sentiment', 'unknown'),
+                            confidence=result.get('confidence', 0.0)
+                        )
+                    except Exception as sqlite_error:
+                        logger.error(f"SQLite save error: {str(sqlite_error)}")
+                        
                 db_session.commit()
                 db_session.close()
             except Exception as db_error:
@@ -344,140 +344,11 @@ def predict_batch() -> tuple[Dict[str, Any], int]:
         logger.error(f"Error processing batch request: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/history', methods=['GET', 'OPTIONS'])
-def get_history() -> tuple[Dict[str, Any], int]:
-    if request.method == 'OPTIONS':
-        return jsonify({'status': 'ok'}), 200
-
-    try:
-        session_id = get_session_id()
-        logger.info(f"Fetching history for session: {session_id}")
-
-        db_session = get_db_session(db_engine)
-
-        predictions = db_session.query(Prediction).filter(
-            Prediction.session_id == session_id
-        ).order_by(Prediction.timestamp.desc()).all()
-
-        predictions_list = [pred.to_dict() for pred in predictions]
-        db_session.close()
-
-        return jsonify({
-            'predictions': predictions_list,
-            'session_id': session_id
-        }), 200
-
-    except Exception as e:
-        logger.error(f"Error fetching history: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/favorite/<int:prediction_id>', methods=['POST', 'OPTIONS'])
-def toggle_favorite(prediction_id: int) -> tuple[Dict[str, Any], int]:
-    if request.method == 'OPTIONS':
-        return jsonify({'status': 'ok'}), 200
-
-    try:
-        session_id = get_session_id()
-        db_session = get_db_session(db_engine)
-
-        prediction = db_session.query(Prediction).filter(
-            Prediction.id == prediction_id,
-            Prediction.session_id == session_id
-        ).first()
-
-        if not prediction:
-            db_session.close()
-            return jsonify({'error': 'Prediction not found'}), 404
-
-        prediction.is_favorite = not prediction.is_favorite
-        db_session.commit()
-        is_favorite = prediction.is_favorite
-        db_session.close()
-
-        return jsonify({
-            'id': prediction_id,
-            'is_favorite': is_favorite,
-            'message': 'Favorite status updated successfully'
-        }), 200
-
-    except Exception as e:
-        logger.error(f"Error toggling favorite: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/analytics', methods=['GET'])
-def analytics():
-    try:
-        trends = get_sentiment_trends()
-        summary = get_sentiment_summary()
-        return jsonify({
-            'trends': trends,
-            'summary': summary
-        }), 200
-    except Exception as e:
-        logger.error(f"Analytics error: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/export', methods=['GET'])
-def export_data():
-    try:
-        predictions = get_all_predictions()
-
-        output = io.StringIO()
-        writer = csv.writer(output)
-
-        if predictions:
-            writer.writerow(predictions[0].keys())
-            for pred in predictions:
-                writer.writerow(pred.values())
-
-        return Response(
-            output.getvalue(),
-            mimetype="text/csv",
-            headers={"Content-disposition": "attachment; filename=sentiment_history.csv"}
-        )
-    except Exception as e:
-        logger.error(f"Export error: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/clear-history', methods=['POST'])
-def clear_history():
-    try:
-        # Clear SQLite history
-        clear_all_predictions()
-        
-        # Clear SQLAlchemy history for current session
-        session_id = get_session_id()
-        db_session = get_db_session(db_engine)
-        db_session.query(Prediction).filter(Prediction.session_id == session_id).delete()
-        db_session.commit()
-        db_session.close()
-        
-        return jsonify({'status': 'success', 'message': 'History cleared'}), 200
-    except Exception as e:
-        logger.error(f"Clear history error: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-
-# ============================================================================
-# MULTILINGUAL ENDPOINTS
-# ============================================================================
 
 @app.route('/predict/multilingual', methods=['POST', 'OPTIONS'])
 @limiter.limit("30 per minute")
 def predict_sentiment_multilingual():
-    """
-    Multilingual sentiment prediction endpoint
-    
-    Request body:
-    {
-        "text": "Your text here",
-        "language": "en"  // optional, will auto-detect if not provided
-    }
-    """
+    """Multilingual sentiment prediction endpoint"""
     if request.method == 'OPTIONS':
         return jsonify({'status': 'ok'}), 200
         
@@ -491,6 +362,7 @@ def predict_sentiment_multilingual():
             return jsonify({"error": "Text field is required"}), 400
         
         text = data.get('text', '').strip()
+        timestamp = data.get('timestamp')
         
         if not text:
             return jsonify({"error": "Input text cannot be empty"}), 400
@@ -508,16 +380,44 @@ def predict_sentiment_multilingual():
         if language == 'auto':
             language = None
         
+        session_id = get_session_id()
+        
         # Try multilingual prediction, fallback to original if no models available
         try:
             result = predict_multilingual(text, language=language)
         except ValueError as ve:
-            # If no multilingual model available, use original English model
             logger.warning(f"Multilingual prediction failed, using fallback: {str(ve)}")
             result = predict_sentiment(text)
             result['language'] = 'en'
             result['fallback'] = True
         
+        # Save to databases
+        try:
+            db_session = get_db_session(db_engine)
+            prediction = Prediction(
+                input_data=json.dumps({'text': text}),
+                prediction_result=json.dumps(result),
+                session_id=session_id
+            )
+            db_session.add(prediction)
+            db_session.commit()
+            prediction_id = prediction.id
+            result['prediction_id'] = prediction_id
+            db_session.close()
+        except Exception as db_error:
+            logger.error(f"Database save error: {str(db_error)}")
+        
+        try:
+            save_prediction(
+                text=text,
+                sentiment=result.get('sentiment', 'unknown'),
+                confidence=result.get('confidence', 0.0),
+                timestamp=timestamp
+            )
+        except Exception as sqlite_error:
+            logger.error(f"SQLite save error: {str(sqlite_error)}")
+        
+        result['session_id'] = session_id
         return jsonify(result), 200
         
     except ValueError as e:
@@ -564,6 +464,8 @@ def predict_sentiment_multilingual_batch():
         if language == 'auto':
             language = None
         
+        session_id = get_session_id()
+        
         # Try multilingual batch prediction, fallback if needed
         try:
             results = predict_multilingual_batch(texts, language=language)
@@ -573,9 +475,35 @@ def predict_sentiment_multilingual_batch():
                 r['language'] = 'en'
                 r['fallback'] = True
         
+        # Save predictions
+        try:
+            db_session = get_db_session(db_engine)
+            for text, result in zip(texts, results):
+                prediction = Prediction(
+                    input_data=json.dumps({'text': text}),
+                    prediction_result=json.dumps(result),
+                    session_id=session_id
+                )
+                db_session.add(prediction)
+                
+                try:
+                    save_prediction(
+                        text=text,
+                        sentiment=result.get('sentiment', 'unknown'),
+                        confidence=result.get('confidence', 0.0)
+                    )
+                except Exception as sqlite_error:
+                    logger.error(f"SQLite save error: {str(sqlite_error)}")
+            
+            db_session.commit()
+            db_session.close()
+        except Exception as db_error:
+            logger.error(f"Database save error: {str(db_error)}")
+        
         return jsonify({
             "results": results,
-            "total_count": len(results)
+            "total_count": len(results),
+            "session_id": session_id
         }), 200
         
     except ValueError as e:
@@ -650,6 +578,129 @@ def detect_language():
     except Exception as e:
         logger.error(f"Error in language detection: {e}")
         return jsonify({"error": "Internal server error"}), 500
+
+
+@app.route('/history', methods=['GET', 'OPTIONS'])
+def get_history() -> tuple[Dict[str, Any], int]:
+    """Get prediction history for current session"""
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+
+    try:
+        session_id = get_session_id()
+        logger.info(f"Fetching history for session: {session_id}")
+
+        db_session = get_db_session(db_engine)
+
+        predictions = db_session.query(Prediction).filter(
+            Prediction.session_id == session_id
+        ).order_by(Prediction.timestamp.desc()).all()
+
+        predictions_list = [pred.to_dict() for pred in predictions]
+        db_session.close()
+
+        return jsonify({
+            'predictions': predictions_list,
+            'session_id': session_id
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error fetching history: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/favorite/<int:prediction_id>', methods=['POST', 'OPTIONS'])
+def toggle_favorite(prediction_id: int) -> tuple[Dict[str, Any], int]:
+    """Toggle favorite status of a prediction"""
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+
+    try:
+        session_id = get_session_id()
+        db_session = get_db_session(db_engine)
+
+        prediction = db_session.query(Prediction).filter(
+            Prediction.id == prediction_id,
+            Prediction.session_id == session_id
+        ).first()
+
+        if not prediction:
+            db_session.close()
+            return jsonify({'error': 'Prediction not found'}), 404
+
+        prediction.is_favorite = not prediction.is_favorite
+        db_session.commit()
+        is_favorite = prediction.is_favorite
+        db_session.close()
+
+        return jsonify({
+            'id': prediction_id,
+            'is_favorite': is_favorite,
+            'message': 'Favorite status updated successfully'
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error toggling favorite: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/analytics', methods=['GET'])
+def analytics():
+    """Get analytics data including trends and summary"""
+    try:
+        trends = get_sentiment_trends()
+        summary = get_sentiment_summary()
+        return jsonify({
+            'trends': trends,
+            'summary': summary
+        }), 200
+    except Exception as e:
+        logger.error(f"Analytics error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/export', methods=['GET'])
+def export_data():
+    """Export prediction history as CSV"""
+    try:
+        predictions = get_all_predictions()
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+
+        if predictions:
+            writer.writerow(predictions[0].keys())
+            for pred in predictions:
+                writer.writerow(pred.values())
+
+        return Response(
+            output.getvalue(),
+            mimetype="text/csv",
+            headers={"Content-disposition": "attachment; filename=sentiment_history.csv"}
+        )
+    except Exception as e:
+        logger.error(f"Export error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/clear-history', methods=['POST'])
+def clear_history():
+    """Clear all prediction history for current session"""
+    try:
+        # Clear SQLite history
+        clear_all_predictions()
+        
+        # Clear SQLAlchemy history for current session
+        session_id = get_session_id()
+        db_session = get_db_session(db_engine)
+        db_session.query(Prediction).filter(Prediction.session_id == session_id).delete()
+        db_session.commit()
+        db_session.close()
+        
+        return jsonify({'status': 'success', 'message': 'History cleared'}), 200
+    except Exception as e:
+        logger.error(f"Clear history error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':
