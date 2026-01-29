@@ -143,15 +143,29 @@
         let experimentConfig = {};
 
         async function fetchModels() {
-            const res = await fetch('/admin/api/models');
-            models = await res.json();
-            renderModels();
+            try {
+                const res = await fetch('/admin/api/models');
+                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                models = await res.json();
+                console.log('Fetched models:', models);
+                renderModels();
+            } catch (e) {
+                console.error('Failed to fetch models:', e);
+                document.getElementById('models-list').innerHTML = `<p style="color: red;">Error loading models: ${e.message}</p>`;
+            }
         }
 
         async function fetchExperiment() {
-            const res = await fetch('/admin/api/experiment');
-            experimentConfig = await res.json();
-            renderExperiment();
+            try {
+                const res = await fetch('/admin/api/experiment');
+                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                experimentConfig = await res.json();
+                console.log('Fetched experiment:', experimentConfig);
+                renderExperiment();
+            } catch (e) {
+                console.error('Failed to fetch experiment:', e);
+                document.getElementById('experiment-config').innerHTML = `<p style="color: red;">Error loading config: ${e.message}</p>`;
+            }
         }
 
         function renderModels() {
@@ -169,7 +183,7 @@
                         ${models.map(m => `
                             <tr>
                                 <td>${m.version}<br><small>${m.created_at}</small></td>
-                                <td>Acc: ${m.metrics.val_accuracy || 'N/A'}</td>
+                                <td>Acc: ${m.metrics ? (m.metrics.val_accuracy || 'N/A') : 'N/A'}</td>
                                 <td><span class="badge status-${m.status}">${m.status}</span></td>
                                 <td>
                                     ${m.status !== 'active' ?
