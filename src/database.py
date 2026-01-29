@@ -35,31 +35,50 @@ class Prediction(Base):
         }
 
 
-class ModelVersion(Base):
-    """Model for storing trained model versions"""
-    __tablename__ = 'model_versions'
-
+class Feedback(Base):
+    """Model for storing user feedback for fine-tuning"""
+    __tablename__ = 'feedback'
+    
     id = Column(Integer, primary_key=True, autoincrement=True)
-    version = Column(String(50), unique=True, nullable=False, index=True)
+    prediction_id = Column(Integer, nullable=True) # Link to prediction (optional)
+    text = Column(Text, nullable=False) # Original text
+    predicted_sentiment = Column(String(20), nullable=True) # Sentiment model predicted
+    correct_sentiment = Column(Integer, nullable=False) # 0 for Negative, 1 for Positive
+    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
+    is_used_for_training = Column(Boolean, default=False, nullable=False)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'prediction_id': self.prediction_id,
+            'text': self.text,
+            'predicted_sentiment': self.predicted_sentiment,
+            'correct_sentiment': self.correct_sentiment,
+            'timestamp': self.timestamp.isoformat() if self.timestamp else None,
+            'is_used_for_training': self.is_used_for_training
+        }
+
+
+class ModelVersion(Base):
+    """Model for tracking model versions and rollback"""
+    __tablename__ = 'model_versions'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    version = Column(String(50), nullable=False, unique=True)
+    path = Column(String(255), nullable=False)
+    accuracy = Column(String(20), nullable=True)
+    is_active = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    model_path = Column(String(255), nullable=False)
-    preprocessor_path = Column(String(255), nullable=False)
-    metrics = Column(Text, nullable=True)  # JSON string of metrics
-    status = Column(String(20), default="archived")  # active, staging, archived, deprecated
 
     def to_dict(self):
         return {
             'id': self.id,
             'version': self.version,
-            'created_at': self.timestamp_iso(),
-            'model_path': self.model_path,
-            'preprocessor_path': self.preprocessor_path,
-            'metrics': json.loads(self.metrics) if self.metrics else {},
-            'status': self.status
+            'path': self.path,
+            'accuracy': self.accuracy,
+            'is_active': self.is_active,
+            'created_at': self.created_at.isoformat() if self.created_at else None
         }
-    
-    def timestamp_iso(self):
-        return self.created_at.isoformat() if self.created_at else None
 
 
 # Database setup
