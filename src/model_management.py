@@ -23,9 +23,9 @@ def activate_model(version_name: str):
         db_session.close()
         raise ValueError(f"Version {version_name} not found in database.")
     
-    if not os.path.exists(version.path):
+    if not os.path.exists(version.model_path):
         db_session.close()
-        raise FileNotFoundError(f"Model file for version {version_name} not found at {version.path}")
+        raise FileNotFoundError(f"Model file for version {version_name} not found at {version.model_path}")
 
     # Backup current model if it exists
     if os.path.exists(MAIN_MODEL_PATH):
@@ -34,12 +34,12 @@ def activate_model(version_name: str):
         logger.info(f"Backed up current model to {backup_path}")
 
     # Copy new version to main path
-    shutil.copy2(version.path, MAIN_MODEL_PATH)
+    shutil.copy2(version.model_path, MAIN_MODEL_PATH)
     logger.info(f"Activated model version {version_name}")
 
-    # Update database
-    db_session.query(ModelVersion).update({ModelVersion.is_active: False})
-    version.is_active = True
+    # Update database: status='active' for new one, 'archived' for others
+    db_session.query(ModelVersion).filter(ModelVersion.status == 'active').update({ModelVersion.status: 'archived'})
+    version.status = 'active'
     db_session.commit()
     db_session.close()
     
@@ -57,7 +57,7 @@ def rollback_to_previous():
         raise ValueError("Not enough model versions to perform rollback.")
 
     # Find current active
-    current_active = next((v for v in versions if v.is_active), None)
+    current_active = next((v for v in versions if v.status == 'active'), None)
     
     # Find next version to activate
     target_version = None
@@ -74,6 +74,16 @@ def rollback_to_previous():
 
 def get_active_version():
     db_session = get_db_session()
-    version = db_session.query(ModelVersion).filter(ModelVersion.is_active == True).first()
+    version = db_session.query(ModelVersion).filter(ModelVersion.status == 'active').first()
     db_session.close()
     return version
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    active = get_active_version()
+    if active:
+        print(f"Current Active Model: {active.version}")
+        print(f"Path: {active.model_path}")
+        print(f"Created: {active.created_at}")
+    else:
+        print("No active model found in the database.")
