@@ -6,7 +6,11 @@ const logger = {
 };
 
 // State
-let sessionId = localStorage.getItem('session_id') || null;
+let sessionId = localStorage.getItem('session_id');
+if (!sessionId) {
+    sessionId = 'sess-' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    localStorage.setItem('session_id', sessionId);
+}
 let sentimentChart = null;
 const maxLength = 500;
 const baseUrl = window.location.origin;
@@ -66,7 +70,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
                 const response = await fetch(`${baseUrl}/predict`, {
                     method: "POST",
-                    headers: { 
+                    headers: {
                         "Content-Type": "application/json",
                         "X-Session-ID": sessionId || ""
                     },
@@ -74,6 +78,11 @@ document.addEventListener("DOMContentLoaded", function () {
                 });
 
                 const data = await response.json();
+
+                if (response.status === 429) {
+                    throw new Error("Slow down! You've reached the request limit. Please wait a minute before trying again.");
+                }
+
                 if (!response.ok) throw new Error(data.error || "Server Error");
 
                 if (data.session_id) {
@@ -103,7 +112,10 @@ document.addEventListener("DOMContentLoaded", function () {
         clearHistoryBtn.addEventListener("click", async () => {
             if (confirm("Are you sure you want to clear all history?")) {
                 try {
-                    const response = await fetch('/clear-history', { method: 'POST' });
+                    const response = await fetch('/clear-history', {
+                        method: 'POST',
+                        headers: { "X-Session-ID": sessionId }
+                    });
                     if (response.ok) {
                         localStorage.removeItem('sentiment_history');
                         fetchAnalytics();
@@ -152,10 +164,23 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!resultSection) return;
         const sentiment = data.sentiment;
         const confidence = (data.confidence * 100).toFixed(1);
-        const isPositive = sentiment.toLowerCase() === "positive";
-        const color = isPositive ? "#10b981" : "#ef4444";
-        const emoji = isPositive ? "🎉" : "😔";
-        const msg = isPositive ? "Great vibes detected!" : "Negative sentiment detected.";
+
+        let color, emoji, msg;
+        const sentimentLower = sentiment.toLowerCase();
+
+        if (sentimentLower === "positive") {
+            color = "#10b981"; // Green
+            emoji = "🎉";
+            msg = "Great vibes detected!";
+        } else if (sentimentLower === "negative") {
+            color = "#ef4444"; // Red
+            emoji = "😔";
+            msg = "Negative sentiment detected.";
+        } else {
+            color = "#6366f1"; // Blue/Indigo for Neutral
+            emoji = "😐";
+            msg = "Neutral sentiment detected.";
+        }
 
         resultSection.innerHTML = `
             <div style="animation: fadeInUp 0.5s ease forwards;">
@@ -195,7 +220,7 @@ document.addEventListener("DOMContentLoaded", function () {
         `;
     }
 
-    window.resetResultSection = function() {
+    window.resetResultSection = function () {
         if (!resultSection) return;
         resultSection.innerHTML = `
             <div class="placeholder-content">
@@ -208,7 +233,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function initHistorySidebar() {
         if (!toggleHistory || !historyContent) return;
-        toggleHistory.addEventListener('click', function() {
+        toggleHistory.addEventListener('click', function () {
             const isCollapsed = historyContent.style.display === 'none';
             historyContent.style.display = isCollapsed ? 'block' : 'none';
             toggleIcon.textContent = isCollapsed ? '▼' : '▲';
@@ -229,6 +254,11 @@ document.addEventListener("DOMContentLoaded", function () {
             const response = await fetch(`${baseUrl}/history`, {
                 headers: { "X-Session-ID": sessionId || "" }
             });
+
+            if (response.status === 429) {
+                throw new Error("Rate limit exceeded for history. Please wait.");
+            }
+
             if (!response.ok) throw new Error("Failed to load history");
 
             const data = await response.json();
@@ -253,18 +283,26 @@ document.addEventListener("DOMContentLoaded", function () {
     function createHistoryCard(prediction) {
         const card = document.createElement('div');
         card.className = 'history-card';
-        
+
         const inputData = typeof prediction.input_data === 'string' ? JSON.parse(prediction.input_data) : prediction.input_data;
         const result = typeof prediction.prediction_result === 'string' ? JSON.parse(prediction.prediction_result) : prediction.prediction_result;
-        
+
         const text = inputData.text || '';
         const sentiment = result.sentiment || 'Unknown';
         const confidence = result.confidence || 0;
         const isFavorite = prediction.is_favorite || false;
         const timestamp = new Date(prediction.timestamp).toLocaleString();
-        
-        const emoji = sentiment.toLowerCase() === "positive" ? "😊" : "😔";
-        const sentimentClass = sentiment.toLowerCase() === "positive" ? "positive" : "negative";
+
+        let emoji = "😐";
+        let sentimentClass = "neutral";
+
+        if (sentiment.toLowerCase() === "positive") {
+            emoji = "😊";
+            sentimentClass = "positive";
+        } else if (sentiment.toLowerCase() === "negative") {
+            emoji = "😔";
+            sentimentClass = "negative";
+        }
 
         card.innerHTML = `
             <div class="history-card-header">
@@ -297,6 +335,12 @@ document.addEventListener("DOMContentLoaded", function () {
                 method: "POST",
                 headers: { "X-Session-ID": sessionId || "" }
             });
+
+            if (response.status === 429) {
+                logger.error("Rate limit hit for favorites");
+                return;
+            }
+
             if (response.ok) {
                 const data = await response.json();
                 btn.classList.toggle('favorited', data.is_favorite);
@@ -309,7 +353,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     async function fetchAnalytics() {
         try {
-            const response = await fetch('/analytics');
+            const response = await fetch('/analytics', {
+                headers: { "X-Session-ID": sessionId }
+            });
             if (!response.ok) return;
             const data = await response.json();
             if (data.trends && data.trends.length > 0) {
@@ -327,10 +373,16 @@ document.addEventListener("DOMContentLoaded", function () {
         const chartData = {
             datasets: [{
                 label: 'Sentiment Trend',
-                data: data.map(item => ({
-                    x: new Date(item.timestamp),
-                    y: item.sentiment === 'positive' ? 1 : 0
-                })),
+                data: data.map(item => {
+                    let yVal = 0.5; // Neutral
+                    if (item.sentiment.toLowerCase() === 'positive') yVal = 1;
+                    if (item.sentiment.toLowerCase() === 'negative') yVal = 0;
+
+                    return {
+                        x: new Date(item.timestamp),
+                        y: yVal
+                    };
+                }),
                 borderColor: '#6366f1',
                 backgroundColor: 'rgba(99, 102, 241, 0.1)',
                 borderWidth: 3,
@@ -348,15 +400,47 @@ document.addEventListener("DOMContentLoaded", function () {
                 maintainAspectRatio: false,
                 scales: {
                     x: { type: 'time', title: { display: true, text: 'Time' } },
-                    y: { 
-                        min: -0.5, max: 1.5, 
-                        ticks: { 
+                    y: {
+                        min: -0.2, max: 1.2,
+                        ticks: {
                             stepSize: 0.5,
-                            callback: value => value === 1 ? 'Positive' : value === 0 ? 'Negative' : ''
-                        } 
+                            callback: value => {
+                                if (value === 1) return 'Positive';
+                                if (value === 0.5) return 'Neutral';
+                                if (value === 0) return 'Negative';
+                                return '';
+                            }
+                        }
                     }
                 }
             }
         });
     }
 });
+// ---- Copy to Clipboard (added feature) ----
+const copyContainer = document.getElementById("copyContainer");
+const copyBtn = document.getElementById("copyBtn");
+const copyFeedback = document.getElementById("copyFeedback");
+
+if (copyContainer) copyContainer.style.display = "block";
+
+if (copyBtn) {
+    copyBtn.onclick = async () => {
+        try {
+            // We need to grab values dynamically from the DOM since they are local to showResult
+            // Or just grab the text content from the result section
+            const resultTag = document.querySelector(".result-tag");
+            const confTag = document.querySelector(".stat-box span:nth-child(2)");
+
+            if (resultTag && confTag) {
+                await navigator.clipboard.writeText(
+                    `${resultTag.innerText} (${confTag.innerText})`
+                );
+                copyFeedback.innerText = "Copied!";
+                setTimeout(() => copyFeedback.innerText = "", 1500);
+            }
+        } catch {
+            copyFeedback.innerText = "Copy failed";
+        }
+    };
+}

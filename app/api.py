@@ -9,6 +9,8 @@ if project_root not in sys.path:
 
 from flask import Flask, request, jsonify, render_template, Response
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from src.predict import initialize_predictor, predict_sentiment, predict_sentiment_batch
 from src.database import (
     init_db,
@@ -41,8 +43,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Configuration
 # Get the directory where this file is located
 basedir = os.path.abspath(os.path.dirname(__file__))
+
+from app.admin_routes import admin_bp
+from src.ab_testing.framework import ABTestingFramework, TrafficSplitStrategy
 
 # Initialize Flask
 app = Flask(__name__, 
@@ -50,6 +56,45 @@ app = Flask(__name__,
     static_folder=os.path.join(basedir, 'static')
 )
 
+# Register Admin Blueprint
+app.register_blueprint(admin_bp)
+
+def get_client_identifier():
+    """
+    Returns a unique identifier for the client based on:
+    1. X-Session-ID header
+    2. session_id cookie
+    3. Remote IP address (fallback)
+    This ensures rate limiting is "browser-based" rather than global.
+    """
+    return request.headers.get('X-Session-ID') or \
+           request.cookies.get('session_id') or \
+           get_remote_address()
+
+# Initialize Rate Limiter
+limiter = Limiter(
+    key_func=get_client_identifier,
+    app=app,
+    default_limits=["200 per day", "50 per hour", "15 per minute"],
+    storage_uri="memory://",
+    strategy="fixed-window",
+    headers_enabled=True
+)
+
+@limiter.request_filter
+def exempt_options():
+    return request.method == "OPTIONS"
+
+# Custom error message for rate limiting
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    return jsonify({
+        "error": "Rate limit exceeded",
+        "message": str(e.description),
+        "status": 429
+    }), 429
+
+# Disable caching for static files (helps during development)
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 
@@ -70,12 +115,43 @@ CORS(app,
      })
 
 # Initialize the database and predictor
+ab_framework = None
+
 try:
     init_sqlite_db()
     init_analytics_db() # ✅ NEW: Initialize analytics DB
     logger.info("Databases initialized successfully")
+    
     initialize_predictor()
     logger.info("Sentiment predictor initialized successfully")
+    
+    # Initialize AB Testing Framework
+    try:
+        ab_framework = ABTestingFramework.load_config("sentiment_v1")
+        logger.info("AB Testing Framework loaded from config")
+    except Exception:
+        logger.info("Initializing new AB Testing Framework")
+        ab_framework = ABTestingFramework("sentiment_v1", strategy=TrafficSplitStrategy.SESSION_HASH)
+        # Use default/latest model if possible, or wait for admin config
+        from src.registry import ModelRegistry
+        registry = ModelRegistry()
+        latest = registry.get_latest_active_model()
+        if latest:
+             from src.ab_testing.framework import ModelVariant
+             variant = ModelVariant(
+                 variant_id=latest.version,
+                 model_path=latest.model_path,
+                 preprocessor_path=latest.preprocessor_path,
+                 description="Default active model"
+             )
+             ab_framework.add_variant(variant)
+             ab_framework.save_config()
+
+except Exception as e:
+    logger.error(f"Initialization error: {str(e)}")
+
+# Initialize the database
+try:
     db_engine = init_db()
     logger.info("Main Database initialized successfully")
 except Exception as e:
@@ -92,11 +168,13 @@ def get_session_id():
     return session_id
 
 @app.route('/')
+@limiter.exempt
 def home() -> str:
     """Serve the main page"""
     return render_template('index.html')
 
 @app.route('/predict', methods=['POST', 'OPTIONS'])
+@limiter.limit("15 per minute")
 def predict() -> tuple[Dict[str, Any], int]:
     # Handle preflight request
     if request.method == 'OPTIONS':
@@ -119,7 +197,18 @@ def predict() -> tuple[Dict[str, Any], int]:
             return jsonify({'error': 'Text exceeds the maximum limit of 1000 characters'}), 400
         
         try:
-            result = predict_sentiment(text)
+            # Get session ID early for AB testing
+            session_id = get_session_id()
+            
+            if ab_framework and ab_framework.variants:
+                try:
+                    result = ab_framework.predict(text, session_id=session_id)
+                except Exception as e:
+                    logger.error(f"AB Framework prediction failed: {e}")
+                    # Fallback
+                    result = predict_sentiment(text)
+            else:
+                result = predict_sentiment(text)
             
             if not isinstance(result, dict):
                 result = {'error': 'Invalid prediction result format'}
@@ -134,8 +223,7 @@ def predict() -> tuple[Dict[str, Any], int]:
                 user_agent=request.headers.get('User-Agent', 'unknown')
             )
 
-            # Get session ID
-            session_id = get_session_id()
+            # Ensure session_id is available (it is fetched above)
             prediction_id = None
             
             # Save prediction to database
@@ -177,7 +265,8 @@ def predict() -> tuple[Dict[str, Any], int]:
         logger.error(f"Error processing request: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/predict_batch', methods=['POST', 'OPTIONS'])
+@app.route('/predict/batch', methods=['POST', 'OPTIONS'])
+@limiter.limit("15 per minute")
 def predict_batch() -> tuple[Dict[str, Any], int]:
     if request.method == 'OPTIONS':
         return jsonify({'status': 'ok'}), 200
@@ -199,8 +288,16 @@ def predict_batch() -> tuple[Dict[str, Any], int]:
             return jsonify({'error': 'Batch size exceeds the maximum limit of 50'}), 400
             
         try:
-            results = predict_sentiment_batch(texts)
             session_id = get_session_id()
+            
+            if ab_framework and ab_framework.variants:
+                try:
+                    results = ab_framework.predict_batch(texts, session_id=session_id)
+                except Exception as e:
+                    logger.error(f"AB Framework batch prediction failed: {e}")
+                    results = predict_sentiment_batch(texts)
+            else:
+                results = predict_sentiment_batch(texts)
             
             # Save all predictions to database
             try:

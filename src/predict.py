@@ -73,16 +73,18 @@ class SentimentPredictor:
             start_time = time.time()
             output = self.model(text_tensor)
             inference_time = time.time() - start_time
-            probability = torch.sigmoid(output).item()
+            probs = torch.softmax(output, dim=1)
+            pred_idx = torch.argmax(probs, dim=1).item()
             
         # Determine sentiment and confidence
-        sentiment = "Positive" if probability > 0.5 else "Negative"
-        confidence = probability if sentiment == "Positive" else 1 - probability
+        sentiment_map = {0: "Negative", 1: "Positive", 2: "Neutral"}
+        sentiment = sentiment_map.get(pred_idx, "Unknown")
+        confidence = probs[0][pred_idx].item()
         
         return {
             "sentiment": sentiment,
             "confidence": round(confidence, 4),
-            "raw_score": round(output.item(), 4),
+            "raw_scores": [round(x, 4) for x in probs[0].tolist()],
             "model_info": self.metadata,
             "inference_time_ms": round(inference_time * 1000, 2)
         }
@@ -101,18 +103,19 @@ class SentimentPredictor:
             outputs = self.model(batch_tensor)
             inference_time = (time.time() - start_time) / len(texts)
             
-            # Use view(-1) to safely handle batch sizes of 1 and above
-            probabilities = torch.sigmoid(outputs).view(-1).tolist()
-            raw_scores = outputs.view(-1).tolist()
+            probs = torch.softmax(outputs, dim=1)
+            pred_indices = torch.argmax(probs, dim=1).tolist()
+            confidences = [probs[i][pred_idx].item() for i, pred_idx in enumerate(pred_indices)]
+            raw_scores = [probs[i].tolist() for i in range(len(texts))]
             
+        sentiment_map = {0: "Negative", 1: "Positive", 2: "Neutral"}
         results = []
-        for prob, raw in zip(probabilities, raw_scores):
-            sentiment = "Positive" if prob > 0.5 else "Negative"
-            confidence = prob if sentiment == "Positive" else 1 - prob
+        for pred_idx, confidence, raw in zip(pred_indices, confidences, raw_scores):
+            sentiment = sentiment_map.get(pred_idx, "Unknown")
             results.append({
                 "sentiment": sentiment,
                 "confidence": round(confidence, 4),
-                "raw_score": round(raw, 4),
+                "raw_scores": [round(x, 4) for x in raw],
                 "model_info": self.metadata,
                 "inference_time_ms": round(inference_time * 1000, 2)
             })
