@@ -37,16 +37,28 @@ limiter = Limiter(
     storage_uri="memory://"
 )
 
-# Initialize multilingual predictor on startup
-@app.before_first_request
-def init_predictor():
-    """Initialize the multilingual predictor before first request"""
-    try:
-        initialize_multilingual_predictor(auto_detect=True, quantize=True)
-        print("Multilingual predictor initialized successfully")
-    except Exception as e:
-        print(f"Warning: Could not initialize multilingual predictor: {e}")
-        print("Multilingual endpoints may not work properly")
+# Initialize multilingual predictor flag
+_predictor_initialized = False
+
+
+def ensure_predictor_initialized():
+    """Ensure the multilingual predictor is initialized (called on first request)"""
+    global _predictor_initialized
+    if not _predictor_initialized:
+        try:
+            initialize_multilingual_predictor(auto_detect=True, quantize=True)
+            print("Multilingual predictor initialized successfully")
+            _predictor_initialized = True
+        except Exception as e:
+            print(f"Warning: Could not initialize multilingual predictor: {e}")
+            print("Multilingual endpoints may not work properly")
+            _predictor_initialized = True  # Prevent repeated initialization attempts
+
+
+@app.before_request
+def before_request():
+    """Initialize predictor on first request if needed"""
+    ensure_predictor_initialized()
 
 
 @app.route('/')
