@@ -15,7 +15,8 @@ from src.predict import initialize_predictor, predict_sentiment, predict_sentime
 from src.database import (
     init_db,
     get_db_session,
-    Prediction
+    Prediction,
+    Feedback
 )
 from app.database import (
     init_db as init_sqlite_db,
@@ -388,6 +389,61 @@ def toggle_favorite(prediction_id: int) -> tuple[Dict[str, Any], int]:
 
     except Exception as e:
         logger.error(f"Error toggling favorite: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/feedback', methods=['POST', 'OPTIONS'])
+@limiter.limit("10 per minute")
+def submit_feedback() -> tuple[Dict[str, Any], int]:
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+
+    try:
+        if not request.is_json:
+            return jsonify({'error': 'Content-Type must be application/json'}), 400
+
+        data = request.get_json()
+        required_fields = ['text', 'actual_sentiment']
+        if not all(field in data for field in required_fields):
+            return jsonify({'error': f'Missing required fields: {required_fields}'}), 400
+
+        text = data['text']
+        actual_sentiment = data['actual_sentiment']
+        prediction_id = data.get('prediction_id')
+        predicted_sentiment = data.get('predicted_sentiment')
+
+        # Map sentiment labels to indices if they are strings
+        sentiment_map = {"Negative": 0, "Positive": 1, "Neutral": 2}
+        if isinstance(actual_sentiment, str):
+            actual_sentiment = sentiment_map.get(actual_sentiment)
+        if isinstance(predicted_sentiment, str):
+            predicted_sentiment = sentiment_map.get(predicted_sentiment)
+
+        if actual_sentiment is None:
+            return jsonify({'error': 'Invalid actual_sentiment value'}), 400
+
+        db_session = get_db_session(db_engine)
+        feedback = Feedback(
+            prediction_id=prediction_id,
+            text=text,
+            predicted_sentiment=predicted_sentiment,
+            actual_sentiment=actual_sentiment
+        )
+        db_session.add(feedback)
+        db_session.commit()
+        feedback_id = feedback.id
+        db_session.close()
+
+        logger.info(f"Received feedback for prediction {prediction_id}: correct={actual_sentiment}")
+
+        return jsonify({
+            'status': 'success',
+            'feedback_id': feedback_id,
+            'message': 'Feedback received. Thank you!'
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error submitting feedback: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 

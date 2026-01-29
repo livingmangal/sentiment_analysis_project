@@ -71,3 +71,34 @@ class ModelRegistry:
             .filter_by(status='active')\
             .order_by(ModelVersion.created_at.desc())\
             .first()
+
+    def rollback(self) -> Optional[ModelVersion]:
+        """
+        Rollback the current active model to the previous model (by ID).
+        Returns the new active model version.
+        """
+        current_active = self.get_latest_active_model()
+        if not current_active:
+            # If no active model, try to activate the latest one
+            latest = self.session.query(ModelVersion)\
+                .order_by(ModelVersion.created_at.desc())\
+                .first()
+            if latest:
+                latest.status = 'active'
+                self.session.commit()
+                return latest
+            return None
+        
+        # Find the next most recent model
+        previous_model = self.session.query(ModelVersion)\
+            .filter(ModelVersion.id < current_active.id)\
+            .order_by(ModelVersion.id.desc())\
+            .first()
+            
+        if previous_model:
+            current_active.status = 'archived'
+            previous_model.status = 'active'
+            self.session.commit()
+            return previous_model
+        
+        return None

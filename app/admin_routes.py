@@ -4,6 +4,7 @@ from src.ab_testing.framework import ABTestingFramework, ModelVariant, TrafficSp
 import os
 import logging
 from src.database import get_db_session
+from src.finetune import finetune_model
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 logger = logging.getLogger(__name__)
@@ -75,4 +76,35 @@ def save_experiment_config():
         return jsonify({'success': True})
     except Exception as e:
         logger.error(f"Error saving experiment config: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/api/models/finetune', methods=['POST'])
+def run_finetune():
+    try:
+        new_version = finetune_model()
+        if new_version:
+            return jsonify({
+                'success': True, 
+                'message': f'Model fine-tuned successfully: {new_version.version}',
+                'version': new_version.version
+            })
+        return jsonify({'success': False, 'message': 'No new feedback to process or fine-tuning failed.'})
+    except Exception as e:
+        logger.error(f"Error during fine-tuning: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/api/models/rollback', methods=['POST'])
+def run_rollback():
+    try:
+        registry = ModelRegistry()
+        new_active = registry.rollback()
+        if new_active:
+            return jsonify({
+                'success': True, 
+                'message': f'Rolled back to version: {new_active.version}',
+                'version': new_active.version
+            })
+        return jsonify({'success': False, 'message': 'No previous version found to rollback to.'})
+    except Exception as e:
+        logger.error(f"Error during rollback: {e}")
         return jsonify({'error': str(e)}), 500

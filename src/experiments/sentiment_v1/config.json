@@ -1,0 +1,15 @@
+{
+  "experiment_name": "sentiment_v1",
+  "strategy": "session_hash",
+  "variants": {
+    "v2.0": {
+      "variant_id": "v2.0",
+      "model_path": "D:\\contri\\ACWOC\\Ideas\\sentiment_analysis_project-main\\models\\versions\\v2.0\\model.pth",
+      "preprocessor_path": "D:\\contri\\ACWOC\\Ideas\\sentiment_analysis_project-main\\models\\versions\\v2.0\\preprocessor.pkl",
+      "metadata_path": null,
+      "weight": 1.0,
+      "description": "Default active model"
+    }
+  },
+  "created_at": "2026-01-29T16:22:37.460953"
+}
