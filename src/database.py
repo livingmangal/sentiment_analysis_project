@@ -35,6 +35,33 @@ class Prediction(Base):
         }
 
 
+class ModelVersion(Base):
+    """Model for storing trained model versions"""
+    __tablename__ = 'model_versions'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    version = Column(String(50), unique=True, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    model_path = Column(String(255), nullable=False)
+    preprocessor_path = Column(String(255), nullable=False)
+    metrics = Column(Text, nullable=True)  # JSON string of metrics
+    status = Column(String(20), default="archived")  # active, staging, archived, deprecated
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'version': self.version,
+            'created_at': self.timestamp_iso(),
+            'model_path': self.model_path,
+            'preprocessor_path': self.preprocessor_path,
+            'metrics': json.loads(self.metrics) if self.metrics else {},
+            'status': self.status
+        }
+    
+    def timestamp_iso(self):
+        return self.created_at.isoformat() if self.created_at else None
+
+
 # Database setup
 def get_db_path():
     """Get the database file path"""
