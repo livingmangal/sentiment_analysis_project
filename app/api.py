@@ -31,6 +31,10 @@ from app.database import (
     clear_all_predictions
 )
 from app.analytics import get_sentiment_trends, get_sentiment_summary
+
+# ✅ NEW: Import new analytics module
+from src.analytics import init_analytics_db, log_request, get_analytics_data
+
 import logging
 from typing import Dict, Any
 import json
@@ -111,7 +115,7 @@ CORS(app,
          r"/*": {
              "origins": allowed_origins,
              "methods": ["GET", "POST", "OPTIONS"],
-             "allow_headers": ["Content-Type", "Authorization", "Accept", "X-Session-ID"]
+             "allow_headers": ["Content-Type", "Authorization", "Accept", "X-Session-ID", "X-Admin-Key"]
          }
      })
 
@@ -138,6 +142,7 @@ try:
     except Exception:
         logger.info("Initializing new AB Testing Framework")
         ab_framework = ABTestingFramework("sentiment_v1", strategy=TrafficSplitStrategy.SESSION_HASH)
+        # Use default/latest model if possible, or wait for admin config
         from src.registry import ModelRegistry
         registry = ModelRegistry()
         latest = registry.get_latest_active_model()
@@ -160,9 +165,7 @@ try:
     db_engine = init_db()
     logger.info("SQLAlchemy database initialized successfully")
 except Exception as e:
-    logger.error(f"Failed to initialize database: {str(e)}")
-    raise
-
+    logger.error(f"Initialization error: {str(e)}")
 
 def get_session_id():
     """Get or generate a session ID from request headers or cookies."""
@@ -174,7 +177,6 @@ def get_session_id():
     if not session_id:
         session_id = str(uuid.uuid4())
         logger.info(f"Generated new session ID: {session_id}")
-    
     return session_id
 
 
@@ -226,6 +228,16 @@ def predict() -> tuple[Dict[str, Any], int]:
                 result = {'error': 'Invalid prediction result format'}
                 return jsonify(result), 500
             
+            # ✅ NEW: Log request to analytics DB
+            log_request(
+                text=text,
+                sentiment=result.get('sentiment', 'unknown'),
+                confidence=result.get('confidence', 0.0),
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent', 'unknown')
+            )
+
+            # Ensure session_id is available (it is fetched above)
             prediction_id = None
             
             # Save to SQLAlchemy database
@@ -259,6 +271,14 @@ def predict() -> tuple[Dict[str, Any], int]:
             response_data = result.copy()
             response_data['session_id'] = session_id
             response_data['prediction_id'] = prediction_id
+            
+            # Save to existing analytics/history database
+            save_prediction(
+                text=text,
+                sentiment=result.get('sentiment', 'unknown'),
+                confidence=result.get('confidence', 0.0),
+                timestamp=timestamp
+            )
                 
             return jsonify(response_data), 200
             
@@ -608,7 +628,7 @@ def get_history() -> tuple[Dict[str, Any], int]:
         logger.error(f"Error fetching history: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-
+# ✅ Restored: Favorites endpoint
 @app.route('/favorite/<int:prediction_id>', methods=['POST', 'OPTIONS'])
 def toggle_favorite(prediction_id: int) -> tuple[Dict[str, Any], int]:
     """Toggle favorite status of a prediction"""
@@ -643,10 +663,22 @@ def toggle_favorite(prediction_id: int) -> tuple[Dict[str, Any], int]:
         logger.error(f"Error toggling favorite: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-
+# ✅ UPDATED: Analytics Endpoint (Now includes Admin Check & new Stats)
 @app.route('/analytics', methods=['GET'])
 def analytics():
-    """Get analytics data including trends and summary"""
+    # 1. Admin Security Check
+    admin_key = request.headers.get('X-Admin-Key')
+    # In production, use os.environ.get('ADMIN_KEY')
+    if admin_key and admin_key == 'secret_admin_key_123':
+        try:
+            # Return the new advanced analytics from src/analytics.py
+            stats = get_analytics_data()
+            return jsonify(stats), 200
+        except Exception as e:
+            logger.error(f"Analytics error: {str(e)}")
+            return jsonify({'error': str(e)}), 500
+    
+    # 2. Public Fallback (Optional - keep existing public trends if needed)
     try:
         trends = get_sentiment_trends()
         summary = get_sentiment_summary()
@@ -658,7 +690,7 @@ def analytics():
         logger.error(f"Analytics error: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-
+# ✅ Restored: Export endpoint
 @app.route('/export', methods=['GET'])
 def export_data():
     """Export prediction history as CSV"""
@@ -682,7 +714,7 @@ def export_data():
         logger.error(f"Export error: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-
+# ✅ Restored: Clear History endpoint
 @app.route('/clear-history', methods=['POST'])
 def clear_history():
     """Clear all prediction history for current session"""
