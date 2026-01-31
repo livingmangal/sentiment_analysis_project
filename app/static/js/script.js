@@ -164,6 +164,8 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!resultSection) return;
         const sentiment = data.sentiment;
         const confidence = (data.confidence * 100).toFixed(1);
+        const predictionId = data.prediction_id;
+        const text = textInput.value.trim();
 
         let color, emoji, msg;
         const sentimentLower = sentiment.toLowerCase();
@@ -198,6 +200,15 @@ document.addEventListener("DOMContentLoaded", function () {
                     </div>
                     <p style="margin-top:1rem; font-size:0.95rem; color:#64748b;">${msg}</p>
                 </div>
+                
+                <div class="feedback-area" id="feedbackArea">
+                    <p>Was this prediction correct?</p>
+                    <div class="feedback-btns">
+                        <button onclick="window.submitFeedback('${predictionId}', '${text}', '${sentiment}', true)" class="feedback-btn yes">Yes</button>
+                        <button onclick="window.submitFeedback('${predictionId}', '${text}', '${sentiment}', false)" class="feedback-btn no">No</button>
+                    </div>
+                </div>
+
                 <button onclick="window.resetResultSection()" class="try-again-btn">Try Another</button>
             </div>
         `;
@@ -207,6 +218,33 @@ document.addEventListener("DOMContentLoaded", function () {
             if (bar) bar.style.width = `${confidence}%`;
         }, 100);
     }
+
+    window.submitFeedback = async function (predictionId, text, predictedSentiment, isCorrect) {
+        const feedbackArea = document.getElementById('feedbackArea');
+        const actualSentiment = isCorrect ? predictedSentiment : (predictedSentiment === "Positive" ? "Negative" : "Positive");
+
+        try {
+            const response = await fetch(`${baseUrl}/feedback`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-Session-ID": sessionId || ""
+                },
+                body: JSON.stringify({
+                    prediction_id: predictionId,
+                    text: text,
+                    predicted_sentiment: predictedSentiment,
+                    actual_sentiment: actualSentiment
+                }),
+            });
+
+            if (response.ok) {
+                feedbackArea.innerHTML = `<p class="feedback-thanks">Thank you for your feedback! ✨</p>`;
+            }
+        } catch (error) {
+            logger.error("Feedback submission failed:", error);
+        }
+    };
 
     function showError(msg) {
         if (!resultSection) return;

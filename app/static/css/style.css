@@ -399,3 +399,52 @@ footer {
     from { opacity: 0; transform: translateY(20px); }
     to { opacity: 1; transform: translateY(0); }
 }
+
+/* Feedback Area */
+.feedback-area {
+    margin: 1.5rem 0;
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: 16px;
+    border: 1px dashed #cbd5e1;
+}
+
+.feedback-area p {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+}
+
+.feedback-btns {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+}
+
+.feedback-btn {
+    padding: 0.5rem 1.25rem;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid #e2e8f0;
+    background: white;
+}
+
+.feedback-btn.yes:hover {
+    background: var(--success);
+    color: white;
+    border-color: var(--success);
+}
+
+.feedback-btn.no:hover {
+    background: var(--danger);
+    color: white;
+    border-color: var(--danger);
+}
+
+.feedback-thanks {
+    color: var(--success) !important;
+    font-weight: 600;
+    animation: fadeInUp 0.3s ease;
+}

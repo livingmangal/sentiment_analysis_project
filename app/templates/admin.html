@@ -120,7 +120,11 @@
 
         <div class="grid">
             <div class="card">
-                <h2>Model Registry</h2>
+                <h2>Model Management</h2>
+                <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                    <button onclick="runFinetune()" id="finetune-btn">Fine-tune on Feedback</button>
+                    <button onclick="runRollback()" class="secondary" id="rollback-btn">Rollback to Previous</button>
+                </div>
                 <div id="models-list">Loading models...</div>
             </div>
 
@@ -139,15 +143,29 @@
         let experimentConfig = {};
 
         async function fetchModels() {
-            const res = await fetch('/admin/api/models');
-            models = await res.json();
-            renderModels();
+            try {
+                const res = await fetch('/admin/api/models');
+                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                models = await res.json();
+                console.log('Fetched models:', models);
+                renderModels();
+            } catch (e) {
+                console.error('Failed to fetch models:', e);
+                document.getElementById('models-list').innerHTML = `<p style="color: red;">Error loading models: ${e.message}</p>`;
+            }
         }
 
         async function fetchExperiment() {
-            const res = await fetch('/admin/api/experiment');
-            experimentConfig = await res.json();
-            renderExperiment();
+            try {
+                const res = await fetch('/admin/api/experiment');
+                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                experimentConfig = await res.json();
+                console.log('Fetched experiment:', experimentConfig);
+                renderExperiment();
+            } catch (e) {
+                console.error('Failed to fetch experiment:', e);
+                document.getElementById('experiment-config').innerHTML = `<p style="color: red;">Error loading config: ${e.message}</p>`;
+            }
         }
 
         function renderModels() {
@@ -165,7 +183,7 @@
                         ${models.map(m => `
                             <tr>
                                 <td>${m.version}<br><small>${m.created_at}</small></td>
-                                <td>Acc: ${m.metrics.val_accuracy || 'N/A'}</td>
+                                <td>Acc: ${m.metrics ? (m.metrics.val_accuracy || 'N/A') : 'N/A'}</td>
                                 <td><span class="badge status-${m.status}">${m.status}</span></td>
                                 <td>
                                     ${m.status !== 'active' ?
@@ -215,6 +233,51 @@
                 body: JSON.stringify({ status })
             });
             fetchModels();
+        }
+
+        async function runFinetune() {
+            const btn = document.getElementById('finetune-btn');
+            const originalText = btn.innerText;
+            btn.innerText = 'Fine-tuning...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/admin/api/models/finetune', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    alert(data.message);
+                    fetchModels();
+                } else {
+                    alert(data.message || 'Fine-tuning failed.');
+                }
+            } catch (e) {
+                alert('Error during fine-tuning');
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        async function runRollback() {
+            if (!confirm('Are you sure you want to rollback to the previous model version?')) return;
+
+            const btn = document.getElementById('rollback-btn');
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/admin/api/models/rollback', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    alert(data.message);
+                    fetchModels();
+                } else {
+                    alert(data.error || 'Rollback failed.');
+                }
+            } catch (e) {
+                alert('Error during rollback');
+            } finally {
+                btn.disabled = false;
+            }
         }
 
         function addToExperiment(version) {

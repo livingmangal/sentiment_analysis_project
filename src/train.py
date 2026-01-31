@@ -2,8 +2,14 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
-from model import SentimentLSTM
-from preprocessing import TextPreprocessor
+try:
+    from src.model import SentimentLSTM
+    from src.preprocessing import TextPreprocessor
+    from src.registry import ModelRegistry
+except ImportError:
+    from model import SentimentLSTM
+    from preprocessing import TextPreprocessor
+    from registry import ModelRegistry
 import random
 import pandas as pd
 from sklearn.model_selection import train_test_split
@@ -136,8 +142,6 @@ def create_and_train_model():
                 }
     
     # Register the best model
-    from src.registry import ModelRegistry
-    
     print("\nRegistering best model...")
     temp_model_path = os.path.join(project_root, 'models', 'temp_best_model.pth')
     temp_preproc_path = os.path.join(project_root, 'models', 'temp_preprocessor.pkl')

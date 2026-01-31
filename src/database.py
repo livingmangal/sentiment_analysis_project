@@ -35,6 +35,30 @@ class Prediction(Base):
         }
 
 
+class Feedback(Base):
+    """Model for storing user feedback on predictions"""
+    __tablename__ = 'feedback'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    prediction_id = Column(Integer, nullable=True, index=True)
+    text = Column(Text, nullable=False)
+    predicted_sentiment = Column(Integer, nullable=True) # Index of sentiment
+    actual_sentiment = Column(Integer, nullable=False)   # Index of sentiment
+    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
+    is_used_for_training = Column(Boolean, default=False, nullable=False)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'prediction_id': self.prediction_id,
+            'text': self.text,
+            'predicted_sentiment': self.predicted_sentiment,
+            'actual_sentiment': self.actual_sentiment,
+            'timestamp': self.timestamp.isoformat() if self.timestamp else None,
+            'is_used_for_training': self.is_used_for_training
+        }
+
+#by shaikhwarsi
 class ModelVersion(Base):
     """Model for storing trained model versions"""
     __tablename__ = 'model_versions'
