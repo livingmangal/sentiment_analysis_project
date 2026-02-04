@@ -374,6 +374,40 @@
             }
         }
 
+        /* Feedback Section (Issue #69) */
+        .feedback-section {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+            text-align: center;
+            display: none; /* Hidden by default */
+        }
+        .feedback-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .btn-feedback {
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.2s;
+        }
+        .btn-feedback:hover {
+            background: #f0f0f0;
+            border-color: #ccc;
+        }
+        .correction-area {
+            display: none;
+            margin-top: 15px;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 8px;
+          
         /* Bulk Upload Styles */
         .bulk-upload-area {
             border: 2px dashed #cbd5e0;
@@ -489,6 +523,26 @@
                             <span>Inference Time:</span>
                             <span id="inferenceTime">-</span>
                         </div>
+                    </div>
+
+                    <div class="feedback-section" id="feedbackSection">
+                        <p style="color: #666; font-size: 0.9em;">Is this prediction correct?</p>
+                        <div class="feedback-buttons">
+                            <button class="btn-feedback" onclick="sendFeedback(true)">👍 Yes</button>
+                            <button class="btn-feedback" onclick="showCorrectionUI()">👎 No</button>
+                        </div>
+                        
+                        <div class="correction-area" id="correctionArea">
+                            <p style="margin-bottom: 8px; font-size: 0.9em;">What is the correct sentiment?</p>
+                            <div class="feedback-buttons">
+                                <button class="btn-feedback" onclick="sendFeedback(false, 'Positive')">Positive</button>
+                                <button class="btn-feedback" onclick="sendFeedback(false, 'Negative')">Negative</button>
+                                <button class="btn-feedback" onclick="sendFeedback(false, 'Neutral')">Neutral</button>
+                            </div>
+                        </div>
+                        <p id="feedbackMessage" style="color: green; margin-top: 10px; display: none; font-size: 0.9em;">
+                            Thanks! We'll use this to improve the model.
+                        </p>
                     </div>
                 </div>
                 <div class="empty-state" id="emptyState">
@@ -912,6 +966,62 @@
             }
         });
 
+
+        // --- Feedback Logic (Issue #69) ---
+        let currentPredictionId = null;
+        let currentText = "";
+        let currentPredictedSentiment = "";
+
+        // Hook into your existing displayResult function
+        const originalDisplayResult = displayResult;
+        displayResult = function(data) {
+            originalDisplayResult(data); // Call original UI logic
+            
+            // Show Feedback Section
+            document.getElementById('feedbackSection').style.display = 'block';
+            document.getElementById('correctionArea').style.display = 'none';
+            document.getElementById('feedbackMessage').style.display = 'none';
+            
+            // Store data for feedback
+            currentPredictionId = data.prediction_id;
+            currentText = document.getElementById('textInput').value;
+            currentPredictedSentiment = data.sentiment;
+        };
+
+        function showCorrectionUI() {
+            document.getElementById('correctionArea').style.display = 'block';
+        }
+
+        async function sendFeedback(isCorrect, correctedSentiment = null) {
+            const actualSentiment = isCorrect ? currentPredictedSentiment : correctedSentiment;
+            
+            try {
+                const response = await fetch('/feedback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prediction_id: currentPredictionId,
+                        text: currentText,
+                        predicted_sentiment: currentPredictedSentiment,
+                        actual_sentiment: actualSentiment
+                    })
+                });
+
+                if (response.ok) {
+                    document.getElementById('feedbackSection').style.display = 'none'; // Hide buttons
+                    document.getElementById('feedbackMessage').style.display = 'block'; // Show success
+                    
+                    // Optional: If you want to show the message briefly then hide
+                    const feedbackMsg = document.getElementById('feedbackMessage');
+                    feedbackMsg.style.display = 'block';
+                    document.getElementById('correctionArea').style.display = 'none';
+                    document.querySelector('.feedback-buttons').style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Feedback error:', error);
+                alert('Failed to send feedback.');
+            }
+        }
         // --- Bulk Analysis Logic (Issue #70) ---
         const dropZone = document.getElementById('dropZone');
         const fileInput = document.getElementById('csvFileInput');
