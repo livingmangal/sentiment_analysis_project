@@ -42,17 +42,53 @@ class SentimentPredictor:
         # Set model to evaluation mode
         self.model.eval()
         
-        # Move model to CPU
+        # Move model to CPU (Required for Dynamic Quantization)
         self.device = torch.device('cpu')
         self.model = self.model.to(self.device)
 
-        # Model Quantization (Dynamic Quantization for CPU)
+        # --- Model Quantization & Benchmarking (Issue #68) ---
         if quantize:
             try:
+                print("\n[PERFORMANCE] Starting Quantization Benchmark...")
+                
+                # FIX: Check actual vocab size to avoid "Index out of range"
+                vocab_limit = self.model.embedding.num_embeddings
+                # Generate random words that are guaranteed to exist in the model
+                # We cap it at 'vocab_limit' so we don't crash the embedding layer
+                safe_high = max(2, vocab_limit) 
+                
+                # 1. Create Dummy Input
+                dummy_input = torch.randint(0, safe_high, (1, 20)).to(self.device)
+
+                # 2. Warmup & Measure Baseline (Float32)
+                with torch.no_grad():
+                    self.model(dummy_input) # Warmup
+                    start_t = time.time()
+                    for _ in range(20): # Run 20 iterations
+                        self.model(dummy_input)
+                    float_time = (time.time() - start_t) / 20 * 1000 # Avg ms
+
+                print(f"[PERFORMANCE] Original (Float32) Latency: {float_time:.2f} ms")
+
+                # 3. Apply Dynamic Quantization
                 self.model = torch.quantization.quantize_dynamic(
                     self.model, {torch.nn.Linear, torch.nn.LSTM}, dtype=torch.qint8
                 )
                 self.metadata["quantized"] = True
+                
+                # 4. Measure New Speed (Int8)
+                with torch.no_grad():
+                    self.model(dummy_input) # Warmup
+                    start_t = time.time()
+                    for _ in range(20): # Run 20 iterations
+                        self.model(dummy_input)
+                    int8_time = (time.time() - start_t) / 20 * 1000 # Avg ms
+                
+                # 5. Report Results
+                speedup = float_time / int8_time if int8_time > 0 else 0
+                print(f"[PERFORMANCE] Quantized (Int8) Latency:   {int8_time:.2f} ms")
+                print(f"[PERFORMANCE] Speedup Factor:             {speedup:.2f}x 🚀")
+                
             except Exception as e:
                 print(f"Warning: Model quantization failed: {e}")
                 self.metadata["quantized"] = False
@@ -159,8 +195,9 @@ def predict_sentiment_batch(texts: List[str]) -> List[dict]:
 if __name__ == "__main__":
     try:
         initialize_predictor()
+        print("\n--- Testing Prediction ---")
         test_text = "This movie was fantastic!"
         result = predict_sentiment(test_text)
-        print(json.dumps(result, indent=2)) # Pretty print to verify metadata
+        print(json.dumps(result, indent=2))
     except Exception as e:
         print(f"Error: {str(e)}")
