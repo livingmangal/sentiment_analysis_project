@@ -1,5 +1,6 @@
 import sys
 import os
+import csv
 
 # Add project root to sys.path automatically
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -392,6 +393,9 @@ def toggle_favorite(prediction_id: int) -> tuple[Dict[str, Any], int]:
         return jsonify({'error': str(e)}), 500
 
 
+# ... existing imports ...
+import csv # Ensure this is imported at the top
+
 @app.route('/feedback', methods=['POST', 'OPTIONS'])
 @limiter.limit("10 per minute")
 def submit_feedback() -> tuple[Dict[str, Any], int]:
@@ -408,38 +412,55 @@ def submit_feedback() -> tuple[Dict[str, Any], int]:
             return jsonify({'error': f'Missing required fields: {required_fields}'}), 400
 
         text = data['text']
-        actual_sentiment = data['actual_sentiment']
-        prediction_id = data.get('prediction_id')
+        actual_sentiment = data['actual_sentiment'] # e.g., "Positive", "Negative"
         predicted_sentiment = data.get('predicted_sentiment')
+        prediction_id = data.get('prediction_id')
 
-        # Map sentiment labels to indices if they are strings
-        sentiment_map = {"Negative": 0, "Positive": 1, "Neutral": 2}
-        if isinstance(actual_sentiment, str):
-            actual_sentiment = sentiment_map.get(actual_sentiment)
-        if isinstance(predicted_sentiment, str):
-            predicted_sentiment = sentiment_map.get(predicted_sentiment)
+        # 1. Save to Database (Existing Logic)
+        try:
+            db_session = get_db_session(db_engine)
+            # Convert string labels to integers if your DB expects IDs
+            sentiment_map = {"Negative": 0, "Positive": 1, "Neutral": 2}
+            actual_id = sentiment_map.get(actual_sentiment, 2) if isinstance(actual_sentiment, str) else actual_sentiment
+            predicted_id = sentiment_map.get(predicted_sentiment, 2) if isinstance(predicted_sentiment, str) else predicted_sentiment
 
-        if actual_sentiment is None:
-            return jsonify({'error': 'Invalid actual_sentiment value'}), 400
+            feedback = Feedback(
+                prediction_id=prediction_id,
+                text=text,
+                predicted_sentiment=predicted_id,
+                actual_sentiment=actual_id
+            )
+            db_session.add(feedback)
+            db_session.commit()
+            db_session.close()
+        except Exception as db_e:
+            logger.error(f"DB Save Error: {db_e}")
 
-        db_session = get_db_session(db_engine)
-        feedback = Feedback(
-            prediction_id=prediction_id,
-            text=text,
-            predicted_sentiment=predicted_sentiment,
-            actual_sentiment=actual_sentiment
-        )
-        db_session.add(feedback)
-        db_session.commit()
-        feedback_id = feedback.id
-        db_session.close()
+        # 2. Save to CSV (The "Data Flywheel" - Issue #69)
+        # This creates a tangible file you can immediately use for retraining
+        csv_file = os.path.join(project_root, 'data', 'feedback_dataset.csv')
+        os.makedirs(os.path.dirname(csv_file), exist_ok=True)
+        
+        file_exists = os.path.isfile(csv_file)
+        
+        with open(csv_file, mode='a', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            # Write header if new file
+            if not file_exists:
+                writer.writerow(['timestamp', 'text', 'predicted_sentiment', 'actual_sentiment'])
+            
+            writer.writerow([
+                time.strftime("%Y-%m-%d %H:%M:%S"),
+                text,
+                predicted_sentiment,
+                actual_sentiment
+            ])
 
-        logger.info(f"Received feedback for prediction {prediction_id}: correct={actual_sentiment}")
+        logger.info(f"Feedback saved to CSV: {actual_sentiment}")
 
         return jsonify({
             'status': 'success',
-            'feedback_id': feedback_id,
-            'message': 'Feedback received. Thank you!'
+            'message': 'Feedback received. Dataset updated!'
         }), 200
 
     except Exception as e:
