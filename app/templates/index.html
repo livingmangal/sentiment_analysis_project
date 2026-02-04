@@ -407,6 +407,20 @@
             background: #f8f9fa;
             padding: 10px;
             border-radius: 8px;
+          
+        /* Bulk Upload Styles */
+        .bulk-upload-area {
+            border: 2px dashed #cbd5e0;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            background: #f7fafc;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .bulk-upload-area:hover, .bulk-upload-area.dragover {
+            border-color: #667eea;
+            background: #ebf4ff;
         }
 
     </style>
@@ -543,6 +557,7 @@
             <div class="tabs">
                 <button class="tab active" data-tab="history">History</button>
                 <button class="tab" data-tab="analytics">Analytics</button>
+                <button class="tab" data-tab="bulk">Bulk Analysis</button> </div>
             </div>
 
             <div class="tab-content active" id="history-tab">
@@ -565,6 +580,39 @@
                     <canvas id="sentimentChart"></canvas>
                 </div>
                 <div id="analyticsStats" style="margin-top: 20px;"></div>
+            </div>
+        </div>
+
+        <div class="tab-content" id="bulk-tab">
+            <div class="bulk-upload-area" id="dropZone">
+                <p>📂 Drag & Drop CSV file here</p>
+                <p style="font-size: 0.8em; color: #aaa;">(One text per line)</p>
+                <input type="file" id="csvFileInput" accept=".csv" style="display: none;">
+                <button class="btn-secondary" onclick="document.getElementById('csvFileInput').click()">Select File</button>
+            </div>
+
+            <div id="bulkLoading" class="loading">
+                <div class="spinner"></div>
+                <p>Processing batch...</p>
+            </div>
+
+            <div id="bulkResults" style="display: none; margin-top: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <h3>Results</h3>
+                    <button class="btn-primary" onclick="downloadBulkCSV()" style="padding: 5px 15px; font-size: 0.9em;">⬇ Download CSV</button>
+                </div>
+                <div style="max-height: 300px; overflow-y: auto; border: 1px solid #eee;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.9em;">
+                        <thead>
+                            <tr style="background: #f8f9fa; text-align: left;">
+                                <th style="padding: 10px;">Text</th>
+                                <th style="padding: 10px;">Sentiment</th>
+                                <th style="padding: 10px;">Confidence</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bulkTableBody"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -918,6 +966,7 @@
             }
         });
 
+
         // --- Feedback Logic (Issue #69) ---
         let currentPredictionId = null;
         let currentText = "";
@@ -973,6 +1022,84 @@
                 alert('Failed to send feedback.');
             }
         }
+        // --- Bulk Analysis Logic (Issue #70) ---
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('csvFileInput');
+        let bulkData = [];
+
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+        function handleFiles(files) {
+            if (files.length === 0) return;
+            uploadBulkFile(files[0]);
+        }
+
+        async function uploadBulkFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            document.getElementById('bulkLoading').style.display = 'block';
+            document.getElementById('bulkResults').style.display = 'none';
+
+            try {
+                const response = await fetch('/predict/bulk-file', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                if (data.error) throw new Error(data.error);
+                
+                bulkData = data.results;
+                renderBulkTable(bulkData);
+            } catch (error) {
+                alert('Upload failed: ' + error.message);
+            } finally {
+                document.getElementById('bulkLoading').style.display = 'none';
+            }
+        }
+
+        function renderBulkTable(data) {
+            const tbody = document.getElementById('bulkTableBody');
+            tbody.innerHTML = data.map(row => `
+                <tr style="border-bottom: 1px solid #eee;">
+                    <td style="padding: 8px;">${row.text.substring(0, 50)}...</td>
+                    <td style="padding: 8px;"><span class="sentiment-badge sentiment-${row.sentiment.toLowerCase()}" style="padding: 2px 8px; font-size: 0.8em;">${row.sentiment}</span></td>
+                    <td style="padding: 8px;">${(row.confidence * 100).toFixed(1)}%</td>
+                </tr>
+            `).join('');
+            document.getElementById('bulkResults').style.display = 'block';
+        }
+
+        function downloadBulkCSV() {
+            if (!bulkData.length) return;
+            let csvContent = "data:text/csv;charset=utf-8,Text,Sentiment,Confidence\n";
+            bulkData.forEach(row => {
+                csvContent += `"${row.text.replace(/"/g, '""')}","${row.sentiment}",${row.confidence}\n`;
+            });
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "sentiment_results.csv");
+            document.body.appendChild(link);
+            link.click();
+        }
+        
     </script>
 </body>
 </html>
