@@ -501,6 +501,55 @@ def clear_history():
     except Exception as e:
         logger.error(f"Clear history error: {str(e)}")
         return jsonify({'error': str(e)}), 500
+    
+# --- Bulk CSV Handling (Issue #70) ---
+@app.route('/predict/bulk-file', methods=['POST'])
+@limiter.limit("5 per minute")
+def predict_bulk_file():
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file part'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No selected file'}), 400
+            
+        if not file.filename.endswith('.csv'):
+            return jsonify({'error': 'File must be a CSV'}), 400
+
+        # Read CSV
+        stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
+        reader = csv.reader(stream)
+        
+        # Validation: Check headers or assume first column is text
+        rows = list(reader)
+        if not rows:
+            return jsonify({'error': 'Empty file'}), 400
+            
+        # Guess which column has text (default to first column)
+        text_col_idx = 0
+        
+        # Prepare batch
+        texts = [row[text_col_idx] for row in rows if row]
+        
+        # Run Batch Prediction
+        # We reuse the existing logic but bypass the API limit check since this is a file upload
+        results = predict_sentiment_batch(texts)
+        
+        # Combine original text with results
+        output = []
+        for i, res in enumerate(results):
+            output.append({
+                'text': texts[i],
+                'sentiment': res['sentiment'],
+                'confidence': res['confidence']
+            })
+            
+        return jsonify({'results': output}), 200
+
+    except Exception as e:
+        logger.error(f"Bulk file error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
