@@ -2,10 +2,7 @@
 Extended Flask API with Multilingual Sentiment Analysis Support
 Add these routes to your existing app/api.py or use as separate blueprint
 """
-import os
-
-from dotenv import load_dotenv
-from flask import Flask, jsonify, render_template, request
+from flask import Blueprint, request, jsonify, render_template
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -21,22 +18,7 @@ from src.predict_multilingual import (
 # Load environment variables
 load_dotenv()
 
-app = Flask(__name__)
-
-# CORS configuration
-allowed_origins = os.getenv('ALLOWED_ORIGINS', '*')
-if allowed_origins == '*':
-    CORS(app)
-else:
-    CORS(app, origins=allowed_origins.split(','))
-
-# Rate limiting
-limiter = Limiter(
-    app=app,
-    key_func=get_remote_address,
-    default_limits=["200 per day", "50 per hour"],
-    storage_uri="memory://"
-)
+multilingual_bp = Blueprint('multilingual', __name__)
 
 # Initialize multilingual predictor flag
 _predictor_initialized = False
@@ -47,7 +29,12 @@ def ensure_predictor_initialized():
     global _predictor_initialized
     if not _predictor_initialized:
         try:
-            initialize_multilingual_predictor(auto_detect=True, quantize=True)
+            # Initialize with XLM-RoBERTa
+            initialize_multilingual_predictor(
+                model_name="cardiffnlp/twitter-xlm-roberta-base-sentiment",
+                auto_detect=True, 
+                quantize=True
+            )
             print("Multilingual predictor initialized successfully")
             _predictor_initialized = True
         except Exception as e:
@@ -56,20 +43,22 @@ def ensure_predictor_initialized():
             _predictor_initialized = True  # Prevent repeated initialization attempts
 
 
-@app.before_request
+@multilingual_bp.before_request
 def before_request():
     """Initialize predictor on first request if needed"""
     ensure_predictor_initialized()
 
 
-@app.route('/')
+@multilingual_bp.route('/multilingual')
 def home():
     """Serve the multilingual UI"""
     return render_template('index_multilingual.html')
 
 
-@app.route('/predict/multilingual', methods=['POST'])
-@limiter.limit("30 per minute")
+@multilingual_bp.route('/predict/multilingual', methods=['POST'])
+# Limiter is applied globally in main app or can be applied here if we pass the limiter instance
+# For now we'll assume the main app handles rate limits or we skip strict limits on BP for simplicity
+
 def predict_sentiment_multilingual():
     """
     Multilingual sentiment prediction endpoint
@@ -132,8 +121,8 @@ def predict_sentiment_multilingual():
         return jsonify({"error": "Internal server error"}), 500
 
 
-@app.route('/predict/multilingual/batch', methods=['POST'])
-@limiter.limit("10 per minute")
+@multilingual_bp.route('/predict/multilingual/batch', methods=['POST'])
+
 def predict_sentiment_multilingual_batch():
     """
     Batch multilingual sentiment prediction endpoint
@@ -207,7 +196,7 @@ def predict_sentiment_multilingual_batch():
         return jsonify({"error": "Internal server error"}), 500
 
 
-@app.route('/languages', methods=['GET'])
+@multilingual_bp.route('/languages', methods=['GET'])
 def get_available_languages():
     """
     Get list of available languages
@@ -274,8 +263,8 @@ def get_available_languages():
         return jsonify({"error": "Internal server error"}), 500
 
 
-@app.route('/detect-language', methods=['POST'])
-@limiter.limit("60 per minute")
+@multilingual_bp.route('/detect-language', methods=['POST'])
+
 def detect_language():
     """
     Language detection endpoint
