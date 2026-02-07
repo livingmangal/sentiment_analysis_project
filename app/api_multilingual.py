@@ -2,19 +2,20 @@
 Extended Flask API with Multilingual Sentiment Analysis Support
 Add these routes to your existing app/api.py or use as separate blueprint
 """
-from flask import Flask, request, jsonify, render_template
+import os
+
+from dotenv import load_dotenv
+from flask import Flask, jsonify, render_template, request
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-import os
-from dotenv import load_dotenv
 
 # Import multilingual predictor
 from src.predict_multilingual import (
+    _multilingual_predictor,
     initialize_multilingual_predictor,
     predict_multilingual,
     predict_multilingual_batch,
-    _multilingual_predictor
 )
 
 # Load environment variables
@@ -93,37 +94,37 @@ def predict_sentiment_multilingual():
         # Validate request
         if not request.is_json:
             return jsonify({"error": "Content-Type must be application/json"}), 400
-        
+
         data = request.get_json()
-        
+
         # Validate text field
         if 'text' not in data:
             return jsonify({"error": "Text field is required"}), 400
-        
+
         text = data.get('text', '').strip()
-        
+
         if not text:
             return jsonify({"error": "Input text cannot be empty"}), 400
-        
+
         # Optional language parameter
         language = data.get('language', None)
-        
+
         # Validate language if provided
         if language and language not in ['auto', 'en', 'es', 'fr', 'de', 'hi']:
             return jsonify({
                 "error": f"Unsupported language: {language}",
                 "supported_languages": ["auto", "en", "es", "fr", "de", "hi"]
             }), 400
-        
+
         # Convert 'auto' to None for auto-detection
         if language == 'auto':
             language = None
-        
+
         # Make prediction
         result = predict_multilingual(text, language=language)
-        
+
         return jsonify(result), 200
-        
+
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except Exception as e:
@@ -161,44 +162,44 @@ def predict_sentiment_multilingual_batch():
         # Validate request
         if not request.is_json:
             return jsonify({"error": "Content-Type must be application/json"}), 400
-        
+
         data = request.get_json()
-        
+
         # Validate texts field
         if 'texts' not in data:
             return jsonify({"error": "Texts field is required"}), 400
-        
+
         texts = data.get('texts', [])
-        
+
         if not isinstance(texts, list):
             return jsonify({"error": "Texts must be a list"}), 400
-        
+
         if len(texts) == 0:
             return jsonify({"error": "Texts list cannot be empty"}), 400
-        
+
         if len(texts) > 50:
             return jsonify({"error": "Maximum 50 texts per batch"}), 400
-        
+
         # Filter out empty texts
         texts = [text.strip() for text in texts if text and text.strip()]
-        
+
         if len(texts) == 0:
             return jsonify({"error": "All texts are empty"}), 400
-        
+
         # Optional language parameter
         language = data.get('language', None)
-        
+
         if language == 'auto':
             language = None
-        
+
         # Make predictions
         results = predict_multilingual_batch(texts, language=language)
-        
+
         return jsonify({
             "results": results,
             "total_count": len(results)
         }), 200
-        
+
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except Exception as e:
@@ -229,7 +230,7 @@ def get_available_languages():
         available = set()
         if _multilingual_predictor:
             available = set(_multilingual_predictor.get_available_languages())
-        
+
         languages = [
             {
                 "code": "en",
@@ -262,12 +263,12 @@ def get_available_languages():
                 "available": "hi" in available
             }
         ]
-        
+
         return jsonify({
             "languages": languages,
             "auto_detect_available": True
         }), 200
-        
+
     except Exception as e:
         print(f"Error getting available languages: {e}")
         return jsonify({"error": "Internal server error"}), 500
@@ -299,17 +300,17 @@ def detect_language():
     try:
         if not request.is_json:
             return jsonify({"error": "Content-Type must be application/json"}), 400
-        
+
         data = request.get_json()
-        
+
         if 'text' not in data:
             return jsonify({"error": "Text field is required"}), 400
-        
+
         text = data.get('text', '').strip()
-        
+
         if not text:
             return jsonify({"error": "Input text cannot be empty"}), 400
-        
+
         # Use the language detector
         if _multilingual_predictor:
             detected = _multilingual_predictor.language_detector.detect(text)
@@ -319,12 +320,12 @@ def detect_language():
             detector = AdvancedLanguageDetector()
             detected = detector.detect(text)
             confidence = detector.get_confidence(text)
-        
+
         return jsonify({
             "detected_language": detected,
             "confidence": confidence
         }), 200
-        
+
     except Exception as e:
         print(f"Error in language detection: {e}")
         return jsonify({"error": "Internal server error"}), 500
