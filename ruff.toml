@@ -1,0 +1,24 @@
+# Ruff configuration for sentiment analysis project
+
+# Line length limit
+line-length = 100
+
+[lint]
+# Rules to enable
+select = ["E", "F", "W", "I"]
+
+# Rules to ignore globally
+ignore = [
+    "E402",  # Module level import not at top of file - needed for path manipulation
+    "E501",  # Line too long - we use a higher limit
+    "W293",  # Blank line contains whitespace - in docstrings this is fine
+]
+
+# Per-file ignores
+[lint.per-file-ignores]
+"app/api.py" = ["E402"]  # Path manipulation before imports
+"src/ab_testing/framework.py" = ["F841"]  # Unused variables in framework
+"tests/*" = ["E501", "W293"]  # Long lines and whitespace in tests are OK
+
+[lint.isort]
+known-first-party = ["src", "app"]

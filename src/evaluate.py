@@ -1,4 +1,5 @@
 import torch
+
 from src.model import SentimentLSTM
 
 # Load model

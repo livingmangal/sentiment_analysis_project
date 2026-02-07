@@ -72,15 +72,47 @@ def client():
     with app.test_client() as client:
         yield client
 
+@pytest.fixture
+def mock_predict_multilingual():
+    with patch('app.api.predict_multilingual') as mock:
+        mock.return_value = {
+            'sentiment': 'Positive',
+            'confidence': 0.95,
+            'raw_score': 2.5,
+            'language': 'en',
+            'model_info': {'version': '1.0'},
+            'inference_time_ms': 10.0
+        }
+        yield mock
+
+@pytest.fixture
+def mock_predict_multilingual_batch():
+    with patch('app.api.predict_multilingual_batch') as mock:
+        mock.return_value = [{
+            'sentiment': 'Positive',
+            'confidence': 0.95,
+            'raw_score': 2.5,
+            'language': 'en',
+            'model_info': {'version': '1.0'},
+            'inference_time_ms': 10.0
+        }, {
+            'sentiment': 'Negative',
+            'confidence': 0.85,
+            'raw_score': -1.5,
+            'language': 'en',
+            'model_info': {'version': '1.0'},
+            'inference_time_ms': 10.0
+        }]
+        yield mock
 
 class TestMultilingualPredict:
     """Tests for /predict/multilingual endpoint"""
-    
-    def test_predict_multilingual_english(self, client):
+
+    def test_predict_multilingual_english(self, client, mock_predict_multilingual):
         """Test multilingual prediction with English text"""
-        response = client.post('/predict/multilingual', 
+        response = client.post('/predict/multilingual',
                              json={'text': 'I absolutely love this product!'})
-        
+
         assert response.status_code == 200
         data = response.get_json()
         assert 'sentiment' in data
@@ -90,43 +122,46 @@ class TestMultilingualPredict:
     
     def test_predict_multilingual_with_language(self, client):
         """Test multilingual prediction with explicit language"""
-        response = client.post('/predict/multilingual', 
+        # Update mock to match language
+        mock_predict_multilingual.return_value['language'] = 'en'
+
+        response = client.post('/predict/multilingual',
                              json={'text': 'This is great!', 'language': 'en'})
-        
+
         assert response.status_code == 200
         data = response.get_json()
         assert data['language'] == 'en'
-    
-    def test_predict_multilingual_auto_detect(self, client):
+
+    def test_predict_multilingual_auto_detect(self, client, mock_predict_multilingual):
         """Test multilingual prediction with auto language detection"""
-        response = client.post('/predict/multilingual', 
+        response = client.post('/predict/multilingual',
                              json={'text': 'This is amazing!', 'language': 'auto'})
-        
+
         assert response.status_code == 200
         data = response.get_json()
         assert 'language' in data
-    
+
     def test_predict_multilingual_missing_text(self, client):
         """Test error handling for missing text"""
         response = client.post('/predict/multilingual', json={})
-        
+
         assert response.status_code == 400
         data = response.get_json()
         assert 'error' in data
-    
+
     def test_predict_multilingual_empty_text(self, client):
         """Test error handling for empty text"""
         response = client.post('/predict/multilingual', json={'text': ''})
-        
+
         assert response.status_code == 400
         data = response.get_json()
         assert 'error' in data
-    
+
     def test_predict_multilingual_unsupported_language(self, client):
         """Test error handling for unsupported language"""
-        response = client.post('/predict/multilingual', 
+        response = client.post('/predict/multilingual',
                              json={'text': 'Hello', 'language': 'xyz'})
-        
+
         assert response.status_code == 400
         data = response.get_json()
         assert 'error' in data
@@ -135,47 +170,47 @@ class TestMultilingualPredict:
 
 class TestMultilingualBatchPredict:
     """Tests for /predict/multilingual/batch endpoint"""
-    
-    def test_batch_predict_multilingual(self, client):
+
+    def test_batch_predict_multilingual(self, client, mock_predict_multilingual_batch):
         """Test batch multilingual prediction"""
-        response = client.post('/predict/multilingual/batch', 
+        response = client.post('/predict/multilingual/batch',
                              json={'texts': ['I am happy', 'I am sad']})
-        
+
         assert response.status_code == 200
         data = response.get_json()
         assert 'results' in data
         assert 'total_count' in data
         assert len(data['results']) == 2
-    
+
     def test_batch_predict_multilingual_missing_texts(self, client):
         """Test error handling for missing texts"""
         response = client.post('/predict/multilingual/batch', json={})
-        
+
         assert response.status_code == 400
         data = response.get_json()
         assert 'error' in data
-    
+
     def test_batch_predict_multilingual_empty_list(self, client):
         """Test error handling for empty list"""
         response = client.post('/predict/multilingual/batch', json={'texts': []})
-        
+
         assert response.status_code == 400
 
 
 class TestLanguagesEndpoint:
     """Tests for /languages endpoint"""
-    
+
     def test_get_languages(self, client):
         """Test getting available languages"""
         response = client.get('/languages')
-        
+
         assert response.status_code == 200
         data = response.get_json()
         assert 'languages' in data
         assert 'auto_detect_available' in data
         assert isinstance(data['languages'], list)
         assert len(data['languages']) > 0
-        
+
         # Verify structure of each language entry
         for lang in data['languages']:
             assert 'code' in lang
@@ -232,7 +267,7 @@ class TestLanguageDetection:
     def test_detect_missing_text(self, client):
         """Test error handling for missing text"""
         response = client.post('/detect-language', json={})
-        
+
         assert response.status_code == 400
         data = response.get_json()
         assert 'error' in data
