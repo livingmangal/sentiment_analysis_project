@@ -57,6 +57,10 @@ app = Flask(__name__,
 # Register Admin Blueprint
 app.register_blueprint(admin_bp)
 
+# Register Multilingual Blueprint
+from app.api_multilingual import multilingual_bp
+app.register_blueprint(multilingual_bp)
+
 def get_client_identifier():
     """
     Returns a unique identifier for the client based on:

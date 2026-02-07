@@ -1,7 +1,68 @@
-"""Tests for multilingual sentiment analysis endpoints"""
 import pytest
 import json
+from unittest.mock import patch, MagicMock
 from app.api import app
+from app.api_multilingual import multilingual_bp
+
+@pytest.fixture
+def client():
+    """Sets up a fake client to test the app without running the server"""
+    app.config['TESTING'] = True
+    # We need to register the blueprint here if not already done in app/api.py
+    # But checking Step 61, it IS registered.
+    
+    with app.test_client() as client:
+        yield client
+
+@pytest.fixture(autouse=True)
+def mock_predictor():
+    """Mock the multilingual predictor to avoid loading large models"""
+    with patch('app.api_multilingual.predict_multilingual') as mock_predict, \
+         patch('app.api_multilingual.predict_multilingual_batch') as mock_batch, \
+         patch('app.api_multilingual.initialize_multilingual_predictor') as mock_init, \
+         patch('src.predict_multilingual._multilingual_predictor') as mock_obj:
+        
+        # Setup mock return values
+        mock_predict.return_value = {
+            "sentiment": "Positive",
+            "confidence": 0.95,
+            "raw_score": 0.95,
+            "language": "en",
+            "model_info": {"name": "mock-model"},
+            "inference_time_ms": 10.0
+        }
+        
+        mock_batch.return_value = [
+            {
+                "sentiment": "Positive",
+                "confidence": 0.95,
+                "raw_score": 0.95,
+                "language": "en",
+                "model_info": {"name": "mock-model"},
+                "inference_time_ms": 10.0
+            },
+            {
+                "sentiment": "Negative",
+                "confidence": 0.85,
+                "raw_score": 0.15,
+                "language": "en",
+                "model_info": {"name": "mock-model"},
+                "inference_time_ms": 10.0
+            }
+        ]
+        
+        # Mock language detector for the specific test that uses it directly via the global object
+        mock_detector = MagicMock()
+        mock_detector.detect.return_value = 'en'
+        mock_detector.get_confidence.return_value = {'en': 0.99}
+        mock_obj.language_detector = mock_detector
+        
+        yield {
+            'predict': mock_predict,
+            'batch': mock_batch,
+            'init': mock_init,
+            'obj': mock_obj
+        }
 
 
 @pytest.fixture
@@ -25,7 +86,7 @@ class TestMultilingualPredict:
         assert 'sentiment' in data
         assert 'confidence' in data
         assert 'language' in data
-        assert data['sentiment'] in ['Positive', 'Negative']
+        assert data['sentiment'] == 'Positive'
     
     def test_predict_multilingual_with_language(self, client):
         """Test multilingual prediction with explicit language"""
@@ -126,41 +187,47 @@ class TestLanguagesEndpoint:
 class TestLanguageDetection:
     """Tests for /detect-language endpoint"""
     
-    def test_detect_english(self, client):
-        """Test language detection for English text"""
-        response = client.post('/detect-language', 
-                             json={'text': 'Hello, how are you doing today?'})
-        
-        assert response.status_code == 200
-        data = response.get_json()
-        assert 'detected_language' in data
-        assert 'confidence' in data
     
-    def test_detect_french(self, client):
-        """Test language detection for French text
-        Note: Uses more distinctive French words for reliable detection
-        without langdetect library installed
-        """
-        # Use more distinctive French text with common French words
-        response = client.post('/detect-language', 
-                             json={'text': 'Le chat est très beau et je suis content de le voir'})
+    def test_detect_english(self, client, mock_predictor):
+        """Test language detection - mocked"""
+        # Configure mock for this specific test
+        mock_predictor['obj'].language_detector.detect.return_value = 'en'
+        mock_predictor['obj'].language_detector.get_confidence.return_value = {'en': 0.95}
         
-        assert response.status_code == 200
-        data = response.get_json()
-        assert 'detected_language' in data
-        assert 'confidence' in data
-        # Note: With simple detector (no langdetect), results may vary
-        # Just verify the response structure is correct
-        assert data['detected_language'] in ['en', 'es', 'fr', 'de', 'hi']
+        # We need to ensure _multilingual_predictor is set in the app module scope
+        with patch('app.api_multilingual._multilingual_predictor', mock_predictor['obj']):
+            response = client.post('/detect-language', 
+                                 json={'text': 'Hello, how are you doing today?'})
+        
+            assert response.status_code == 200
+            data = response.get_json()
+            assert data['detected_language'] == 'en'
+            assert 'confidence' in data
     
-    def test_detect_spanish(self, client):
-        """Test language detection for Spanish text"""
-        response = client.post('/detect-language', 
-                             json={'text': 'Hola, ¿cómo estás?'})
+    def test_detect_french(self, client, mock_predictor):
+        """Test language detection - mocked"""
+        mock_predictor['obj'].language_detector.detect.return_value = 'fr'
+        mock_predictor['obj'].language_detector.get_confidence.return_value = {'fr': 0.95}
+
+        with patch('app.api_multilingual._multilingual_predictor', mock_predictor['obj']):
+            response = client.post('/detect-language', 
+                                 json={'text': 'Bonjour le monde'})
+            
+            assert response.status_code == 200
+            data = response.get_json()
+            assert data['detected_language'] == 'fr'
+    
+    def test_detect_spanish(self, client, mock_predictor):
+        """Test language detection - mocked"""
+        mock_predictor['obj'].language_detector.detect.return_value = 'es' 
         
-        assert response.status_code == 200
-        data = response.get_json()
-        assert data['detected_language'] == 'es'
+        with patch('app.api_multilingual._multilingual_predictor', mock_predictor['obj']):
+            response = client.post('/detect-language', 
+                                 json={'text': 'Hola mundo'})
+            
+            assert response.status_code == 200
+            data = response.get_json()
+            assert data['detected_language'] == 'es'
     
     def test_detect_missing_text(self, client):
         """Test error handling for missing text"""

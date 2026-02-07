@@ -17,3 +17,7 @@ scipy>=1.13.0
 kaggle>=1.6.0
 datasets>=2.19.0
 python-dotenv>=1.0.0
+transformers>=4.40.0,<5.0.0
+accelerate>=0.21.0
+sentencepiece>=0.2.0
+protobuf>=4.21.0
