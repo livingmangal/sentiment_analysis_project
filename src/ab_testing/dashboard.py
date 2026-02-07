@@ -4,22 +4,25 @@ Creates HTML dashboard for visualizing A/B test results
 """
 import json
 import os
-from typing import Dict, Any, List
 from datetime import datetime
+from typing import Any, Dict, Optional
+
 from src.ab_testing.metrics import MetricsCollector, VariantMetrics
-from src.ab_testing.statistics import StatisticalAnalyzer
 
 
 class DashboardGenerator:
     """
     Generates HTML dashboard for A/B test comparison
     """
-    
+
     def __init__(self, experiment_name: str):
         self.experiment_name = experiment_name
         self.metrics_collector = MetricsCollector(experiment_name)
-        self.analyzer = StatisticalAnalyzer()
-        
+
+    def _format_timestamp(self, timestamp: datetime) -> str:
+        """Format timestamp for display"""
+        return timestamp.strftime("%Y-%m-%d %H:%M:%S")
+
     def generate_dashboard(self, output_path: Optional[str] = None) -> str:
         """
         Generate complete dashboard HTML
@@ -40,37 +43,37 @@ class DashboardGenerator:
                 experiment_dir,
                 f"dashboard_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
             )
-        
+
         # Collect all metrics
         all_metrics = self.metrics_collector.collect_all_metrics()
         summary_stats = self.metrics_collector.get_summary_stats()
-        
+
         # Generate HTML
         html = self._generate_html(all_metrics, summary_stats)
-        
+
         with open(output_path, 'w') as f:
             f.write(html)
-        
+
         return output_path
-    
+
     def _generate_html(
         self,
         all_metrics: Dict[str, VariantMetrics],
         summary_stats: Dict[str, Any]
     ) -> str:
         """Generate complete HTML dashboard"""
-        
+
         # Prepare data for charts
         variant_labels = list(all_metrics.keys())
         prediction_counts = [m.total_predictions for m in all_metrics.values()]
         avg_confidences = [m.avg_confidence for m in all_metrics.values()]
         avg_times = [m.avg_inference_time_ms for m in all_metrics.values()]
-        
+
         # Sentiment data
         sentiment_data = {}
         for vid, metrics in all_metrics.items():
-            sentiment_data[vid] = metrics.sentiment_distribution
-        
+            sentiment_data[vid] = metrics.sentiment_distribution or {"Positive": 0, "Negative": 0, "Neutral": 0}
+
         html = f"""
 <!DOCTYPE html>
 <html lang="en">
@@ -375,9 +378,9 @@ class DashboardGenerator:
 </body>
 </html>
         """
-        
+
         return html
-    
+
     def _generate_table_rows(
         self,
         all_metrics: Dict[str, VariantMetrics],
@@ -385,14 +388,15 @@ class DashboardGenerator:
     ) -> str:
         """Generate table rows for variant comparison"""
         rows = []
-        
+
         for variant_id, metrics in all_metrics.items():
             variant_stats = summary_stats["variants"].get(variant_id, {})
-            
-            total_sentiment = sum(metrics.sentiment_distribution.values())
-            pos_pct = (metrics.sentiment_distribution.get("Positive", 0) / total_sentiment * 100) if total_sentiment > 0 else 0
-            neg_pct = (metrics.sentiment_distribution.get("Negative", 0) / total_sentiment * 100) if total_sentiment > 0 else 0
-            
+
+            dist = metrics.sentiment_distribution or {"Positive": 0, "Negative": 0, "Neutral": 0}
+            total_sentiment = sum(dist.values())
+            pos_pct = (dist.get("Positive", 0) / total_sentiment * 100) if total_sentiment > 0 else 0
+            neg_pct = (dist.get("Negative", 0) / total_sentiment * 100) if total_sentiment > 0 else 0
+
             row = f"""
                 <tr>
                     <td><strong>{variant_id}</strong></td>
@@ -405,5 +409,5 @@ class DashboardGenerator:
                 </tr>
             """
             rows.append(row)
-        
+
         return '\n'.join(rows)

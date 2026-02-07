@@ -1,20 +1,23 @@
-from datetime import datetime
 import json
 import os
 import shutil
-from typing import List, Optional, Dict
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
 from sqlalchemy.orm import Session
+
 from src.database import ModelVersion, get_db_session
 
+
 class ModelRegistry:
-    def __init__(self, session: Session = None):
+    def __init__(self, session: Optional[Session] = None):
         self.session = session or get_db_session()
 
-    def register_model(self, 
-                       model_path: str, 
-                       preprocessor_path: str, 
-                       metrics: Dict[str, float], 
-                       version: str = None,
+    def register_model(self,
+                       model_path: str,
+                       preprocessor_path: str,
+                       metrics: Dict[str, Any],
+                       version: Optional[str] = None,
                        status: str = "archived") -> ModelVersion:
         """
         Register a new model version.
@@ -34,7 +37,7 @@ class ModelRegistry:
         # Copy files if they are not already in the target location
         if os.path.abspath(model_path) != os.path.abspath(new_model_path):
             shutil.copy2(model_path, new_model_path)
-        
+
         if os.path.abspath(preprocessor_path) != os.path.abspath(new_preproc_path):
             shutil.copy2(preprocessor_path, new_preproc_path)
 
@@ -46,7 +49,7 @@ class ModelRegistry:
             metrics=json.dumps(metrics),
             status=status
         )
-        
+
         self.session.add(model_version)
         self.session.commit()
         return model_version
@@ -57,7 +60,7 @@ class ModelRegistry:
     def list_models(self) -> List[ModelVersion]:
         return self.session.query(ModelVersion).order_by(ModelVersion.created_at.desc()).all()
 
-    def set_status(self, version: str, status: str):
+    def set_status(self, version: str, status: str) -> bool:
         model = self.get_model(version)
         if model:
             model.status = status
@@ -88,17 +91,17 @@ class ModelRegistry:
                 self.session.commit()
                 return latest
             return None
-        
+
         # Find the next most recent model
         previous_model = self.session.query(ModelVersion)\
             .filter(ModelVersion.id < current_active.id)\
             .order_by(ModelVersion.id.desc())\
             .first()
-            
+
         if previous_model:
             current_active.status = 'archived'
             previous_model.status = 'active'
             self.session.commit()
             return previous_model
-        
+
         return None
