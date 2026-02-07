@@ -2,7 +2,7 @@
 Database module for sentiment analysis application.
 Provides SQLAlchemy models and database initialization.
 """
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Text
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Text, Float
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
@@ -19,6 +19,14 @@ class Prediction(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     input_data = Column(Text, nullable=False)  # JSON string of input parameters
     prediction_result = Column(Text, nullable=False)  # JSON string of prediction output
+    
+    # Flattened fields for faster analytics
+    text = Column(Text, nullable=True)
+    sentiment = Column(String(20), nullable=True)
+    confidence = Column(Float, nullable=True)
+    variant_id = Column(String(50), nullable=True)
+    language = Column(String(10), nullable=True)
+    
     is_favorite = Column(Boolean, default=False, nullable=False)
     timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
     session_id = Column(String(255), nullable=False, index=True)
@@ -27,11 +35,16 @@ class Prediction(Base):
         """Convert prediction to dictionary"""
         return {
             'id': self.id,
-            'input_data': json.loads(self.input_data) if isinstance(self.input_data, str) else self.input_data,
-            'prediction_result': json.loads(self.prediction_result) if isinstance(self.prediction_result, str) else self.prediction_result,
+            'text': self.text,
+            'sentiment': self.sentiment,
+            'confidence': self.confidence,
+            'variant_id': self.variant_id,
+            'language': self.language,
             'is_favorite': self.is_favorite,
             'timestamp': self.timestamp.isoformat() if self.timestamp else None,
-            'session_id': self.session_id
+            'session_id': self.session_id,
+            'input_data': json.loads(self.input_data) if isinstance(self.input_data, str) else self.input_data,
+            'prediction_result': json.loads(self.prediction_result) if isinstance(self.prediction_result, str) else self.prediction_result
         }
 
 

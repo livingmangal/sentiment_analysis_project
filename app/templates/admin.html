@@ -4,171 +4,447 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Model Admin Dashboard</title>
+    <title>Intelligent Model Admin Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/lucide-static@0.321.0/font/lucide.min.css" rel="stylesheet">
     <style>
         :root {
             --primary: #4f46e5;
-            --bg: #f3f4f6;
+            --primary-hover: #4338ca;
+            --bg: #f9fafb;
             --card: #ffffff;
-            --text: #1f2937;
+            --text-main: #111827;
+            --text-muted: #6b7280;
+            --border: #e5e7eb;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
         }
 
         body {
             font-family: 'Inter', system-ui, -apple-system, sans-serif;
             background-color: var(--bg);
-            color: var(--text);
-            margin: 0;
+            color: var(--text-main);
+            line-height: 1.5;
+        }
+
+        .layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 260px;
+            background: #1e293b;
+            color: white;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .nav-item {
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            color: #cbd5e1;
+            text-decoration: none;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .nav-item:hover, .nav-item.active {
+            background: #334155;
+            color: white;
+        }
+
+        /* Main Content */
+        .main {
+            flex: 1;
             padding: 2rem;
+            overflow-y: auto;
         }
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
         }
 
-        h1,
-        h2 {
-            color: #111827;
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            font-weight: 500;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-outline { border-color: var(--border); background: white; color: var(--text-main); }
+        .btn-outline:hover { background: var(--bg); }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--card);
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            border: 1px solid var(--border);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        .stat-label { font-size: 0.875rem; color: var(--text-muted); margin-bottom: 0.5rem; }
+        .stat-value { font-size: 1.5rem; font-weight: 700; }
+
+        /* Charts Grid */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
         }
 
         .card {
             background: var(--card);
-            border-radius: 0.5rem;
             padding: 1.5rem;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-            margin-bottom: 2rem;
+            border-radius: 0.75rem;
+            border: 1px solid var(--border);
+            margin-bottom: 1.5rem;
         }
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 1rem;
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
         }
 
-        th,
-        td {
-            text-align: left;
-            padding: 0.75rem;
-            border-bottom: 1px solid #e5e7eb;
-        }
+        .card-title { font-weight: 600; font-size: 1.125rem; }
 
-        th {
-            font-weight: 600;
-            color: #4b5563;
-        }
+        /* Tables */
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 0.75rem; color: var(--text-muted); font-weight: 500; border-bottom: 1px solid var(--border); }
+        td { padding: 0.75rem; border-bottom: 1px solid var(--border); }
 
         .badge {
-            padding: 0.25rem 0.5rem;
+            padding: 0.125rem 0.5rem;
             border-radius: 9999px;
-            font-size: 0.875rem;
+            font-size: 0.75rem;
             font-weight: 500;
         }
 
-        .status-active {
-            background: #d1fae5;
-            color: #065f46;
+        .badge-success { background: #d1fae5; color: #065f46; }
+        .badge-warning { background: #fef3c7; color: #92400e; }
+        .badge-danger { background: #fee2e2; color: #991b1b; }
+
+        /* Alerts */
+        .alert {
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
         }
 
-        .status-staging {
-            background: #fef3c7;
-            color: #92400e;
+        .alert-warning { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+
+        /* Filters */
+        .filters {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
         }
 
-        .status-archived {
-            background: #f3f4f6;
-            color: #4b5563;
-        }
-
-        button {
-            background-color: var(--primary);
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 0.375rem;
-            cursor: pointer;
-            font-weight: 500;
-            transition: opacity 0.2s;
-        }
-
-        button:hover {
-            opacity: 0.9;
-        }
-
-        button.secondary {
-            background-color: #e5e7eb;
-            color: #374151;
-        }
-
-        input[type="number"] {
+        select, input {
             padding: 0.5rem;
-            border: 1px solid #d1d5db;
+            border: 1px solid var(--border);
             border-radius: 0.375rem;
-            width: 80px;
+            background: white;
         }
 
-        .grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 2rem;
-        }
+        #drift-alert { display: none; }
     </style>
 </head>
 
 <body>
-    <div class="container">
-        <h1>Model Admin Dashboard</h1>
-
-        <div class="grid">
-            <div class="card">
-                <h2>Model Management</h2>
-                <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
-                    <button onclick="runFinetune()" id="finetune-btn">Fine-tune on Feedback</button>
-                    <button onclick="runRollback()" class="secondary" id="rollback-btn">Rollback to Previous</button>
+    <div class="layout">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <i class="lucide-brain-circuit"></i>
+                <span>ACWOC Admin</span>
+            </div>
+            <nav>
+                <div class="nav-item active" id="nav-dashboard" onclick="showSection('dashboard')">
+                    <i class="lucide-layout-dashboard"></i> Dashboard
                 </div>
-                <div id="models-list">Loading models...</div>
+                <div class="nav-item" id="nav-models" onclick="showSection('models')">
+                    <i class="lucide-layers"></i> Models
+                </div>
+                <div class="nav-item" id="nav-ab-testing" onclick="showSection('ab-testing')">
+                    <i class="lucide-split"></i> A/B Testing
+                </div>
+            </nav>
+        </aside>
+
+        <main class="main">
+            <div id="dashboard-section">
+                <div class="header">
+                    <h1>Dashboard Insights</h1>
+                    <div class="actions">
+                        <button class="btn btn-outline" onclick="exportCSV()">
+                            <i class="lucide-download"></i> Export CSV
+                        </button>
+                    </div>
+                </div>
+
+                <div id="drift-alert" class="alert alert-warning">
+                    <i class="lucide-alert-triangle"></i>
+                    <div>
+                        <strong>Potential Model Drift Detected!</strong>
+                        <p id="drift-reason"></p>
+                    </div>
+                </div>
+
+                <div class="filters">
+                    <select id="filter-language" onchange="refreshDashboard()">
+                        <option value="">All Languages</option>
+                        <option value="en">English</option>
+                        <option value="es">Spanish</option>
+                        <option value="fr">French</option>
+                    </select>
+                    <select id="filter-variant" onchange="refreshDashboard()">
+                        <option value="">All Variants</option>
+                    </select>
+                    <input type="date" id="filter-start" onchange="refreshDashboard()">
+                    <input type="date" id="filter-end" onchange="refreshDashboard()">
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Total Predictions</div>
+                        <div class="stat-value" id="stat-total">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Avg. Confidence</div>
+                        <div class="stat-value" id="stat-conf">0%</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Active Variants</div>
+                        <div class="stat-value" id="stat-variants">0</div>
+                    </div>
+                </div>
+
+                <div class="charts-grid">
+                    <div class="card">
+                        <div class="card-title">Sentiment Trends</div>
+                        <canvas id="chart-trends"></canvas>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Sentiment Split</div>
+                        <canvas id="chart-sentiment"></canvas>
+                    </div>
+                </div>
+
+                <div class="charts-grid">
+                    <div class="card">
+                        <div class="card-title">Confidence Distribution</div>
+                        <canvas id="chart-conf-dist"></canvas>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Language Distribution</div>
+                        <canvas id="chart-lang"></canvas>
+                    </div>
+                </div>
             </div>
 
-            <div class="card">
-                <h2>A/B Experiment Config</h2>
-                <div id="experiment-config">Loading config...</div>
-                <div style="margin-top: 1rem; text-align: right;">
-                    <button onclick="saveExperimentConfig()">Save Configuration</button>
+            <div id="models-section" style="display: none;">
+                <div class="header">
+                    <h1>Model Management</h1>
+                    <div class="actions">
+                        <button class="btn btn-primary" onclick="runFinetune()" id="finetune-btn">
+                            <i class="lucide-wand-2"></i> Fine-tune Model
+                        </button>
+                        <button class="btn btn-outline" onclick="runRollback()" id="rollback-btn">
+                            <i class="lucide-rotate-ccw"></i> Rollback
+                        </button>
+                    </div>
+                </div>
+                <div class="card">
+                    <div id="models-list">Loading models...</div>
                 </div>
             </div>
-        </div>
+
+            <div id="ab-testing-section" style="display: none;">
+                <div class="header">
+                    <h1>A/B Experiment Configuration</h1>
+                    <button class="btn btn-primary" onclick="saveExperimentConfig()">Save Config</button>
+                </div>
+                <div class="card">
+                    <div id="experiment-config">Loading...</div>
+                </div>
+            </div>
+        </main>
     </div>
 
     <script>
+        let charts = {};
         let models = [];
         let experimentConfig = {};
+
+        async function init() {
+            await fetchModels();
+            await refreshDashboard();
+            await fetchExperiment();
+        }
+
+        function showSection(section) {
+            ['dashboard', 'models', 'ab-testing'].forEach(s => {
+                document.getElementById(`${s}-section`).style.display = s === section ? 'block' : 'none';
+            });
+            ['dashboard', 'models', 'ab-testing'].forEach(s => {
+                document.getElementById(`nav-${s}`).classList.toggle('active', s === section);
+            });
+        }
+
+        async function refreshDashboard() {
+            try {
+                const params = new URLSearchParams({
+                    language: document.getElementById('filter-language').value,
+                    variant_id: document.getElementById('filter-variant').value,
+                    start_date: document.getElementById('filter-start').value,
+                    end_date: document.getElementById('filter-end').value
+                });
+
+                const res = await fetch(`/admin/api/stats?${params}`);
+                const stats = await res.json();
+                updateUI(stats);
+            } catch (e) {
+                console.error('Failed to refresh dashboard:', e);
+            }
+        }
+
+        function updateUI(stats) {
+            document.getElementById('stat-total').innerText = (stats.total_predictions || 0).toLocaleString();
+            document.getElementById('stat-conf').innerText = 
+                ((stats.drift_metrics?.recent_avg_confidence || 0) * 100).toFixed(1) + '%';
+            
+            // Drift Alert
+            const driftAlert = document.getElementById('drift-alert');
+            if (stats.drift_metrics?.drift_detected) {
+                driftAlert.style.display = 'flex';
+                document.getElementById('drift-reason').innerText = stats.drift_metrics.drift_reason;
+            } else {
+                driftAlert.style.display = 'none';
+            }
+
+            renderCharts(stats);
+        }
+
+        function renderCharts(stats) {
+            // Sentiment Split
+            updateChart('chart-sentiment', 'doughnut', {
+                labels: Object.keys(stats.sentiment_distribution || {}),
+                datasets: [{
+                    data: Object.values(stats.sentiment_distribution || {}),
+                    backgroundColor: ['#10b981', '#ef4444', '#f59e0b']
+                }]
+            });
+
+            // Trends
+            updateChart('chart-trends', 'line', {
+                labels: (stats.trends || []).map(t => t.date),
+                datasets: [
+                    { label: 'Positive', data: (stats.trends || []).map(t => t.positive || 0), borderColor: '#10b981', tension: 0.3 },
+                    { label: 'Negative', data: (stats.trends || []).map(t => t.negative || 0), borderColor: '#ef4444', tension: 0.3 }
+                ]
+            });
+
+            // Confidence Dist
+            updateChart('chart-conf-dist', 'bar', {
+                labels: Object.keys(stats.confidence_distribution || {}),
+                datasets: [{
+                    label: 'Predictions',
+                    data: Object.values(stats.confidence_distribution || {}),
+                    backgroundColor: '#4f46e5'
+                }]
+            });
+
+            // Language Dist
+            updateChart('chart-lang', 'pie', {
+                labels: Object.keys(stats.language_distribution || {}),
+                datasets: [{
+                    data: Object.values(stats.language_distribution || {}),
+                    backgroundColor: ['#4f46e5', '#8b5cf6', '#ec4899', '#f43f5e']
+                }]
+            });
+        }
+
+        function updateChart(id, type, data) {
+            if (charts[id]) charts[id].destroy();
+            const canvas = document.getElementById(id);
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            charts[id] = new Chart(ctx, {
+                type: type,
+                data: data,
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
 
         async function fetchModels() {
             try {
                 const res = await fetch('/admin/api/models');
-                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
                 models = await res.json();
-                console.log('Fetched models:', models);
-                renderModels();
+                
+                // Update filter dropdown
+                const variantFilter = document.getElementById('filter-variant');
+                variantFilter.innerHTML = '<option value="">All Variants</option>';
+                models.forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m.version;
+                    opt.text = m.version;
+                    variantFilter.add(opt);
+                });
+
+                renderModelsList();
             } catch (e) {
                 console.error('Failed to fetch models:', e);
-                document.getElementById('models-list').innerHTML = `<p style="color: red;">Error loading models: ${e.message}</p>`;
             }
         }
 
-        async function fetchExperiment() {
-            try {
-                const res = await fetch('/admin/api/experiment');
-                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-                experimentConfig = await res.json();
-                console.log('Fetched experiment:', experimentConfig);
-                renderExperiment();
-            } catch (e) {
-                console.error('Failed to fetch experiment:', e);
-                document.getElementById('experiment-config').innerHTML = `<p style="color: red;">Error loading config: ${e.message}</p>`;
-            }
-        }
-
-        function renderModels() {
+        function renderModelsList() {
             const html = `
                 <table>
                     <thead>
@@ -176,20 +452,27 @@
                             <th>Version</th>
                             <th>Metrics</th>
                             <th>Status</th>
-                            <th>Action</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         ${models.map(m => `
                             <tr>
-                                <td>${m.version}<br><small>${m.created_at}</small></td>
-                                <td>Acc: ${m.metrics ? (m.metrics.val_accuracy || 'N/A') : 'N/A'}</td>
-                                <td><span class="badge status-${m.status}">${m.status}</span></td>
                                 <td>
-                                    ${m.status !== 'active' ?
-                    `<button onclick="updateStatus('${m.version}', 'active')">Activate</button>` :
-                    `<button class="secondary" onclick="updateStatus('${m.version}', 'archived')">Archive</button>`}
-                                    <button class="secondary" onclick="addToExperiment('${m.version}')">Test</button>
+                                    <strong>${m.version}</strong><br>
+                                    <small>${new Date(m.created_at).toLocaleDateString()}</small>
+                                </td>
+                                <td>
+                                    Acc: ${(m.metrics?.val_accuracy || 0).toFixed(3)}
+                                </td>
+                                <td>
+                                    <span class="badge badge-${m.status === 'active' ? 'success' : 'warning'}">${m.status}</span>
+                                </td>
+                                <td>
+                                    ${m.status !== 'active' ? 
+                                        `<button class="btn btn-outline" onclick="updateStatus('${m.version}', 'active')">Activate</button>` :
+                                        `<button class="btn btn-outline" disabled>Active</button>`}
+                                    <button class="btn btn-outline" onclick="addToExperiment('${m.version}')">Add to Test</button>
                                 </td>
                             </tr>
                         `).join('')}
@@ -199,101 +482,109 @@
             document.getElementById('models-list').innerHTML = html;
         }
 
+        async function updateStatus(version, status) {
+            try {
+                await fetch(`/admin/api/models/${version}/status`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status })
+                });
+                await fetchModels();
+            } catch (e) {
+                alert('Failed to update status');
+            }
+        }
+
+        async function runFinetune() {
+            const btn = document.getElementById('finetune-btn');
+            btn.disabled = true;
+            btn.innerText = 'Fine-tuning...';
+            try {
+                const res = await fetch('/admin/api/models/finetune', { method: 'POST' });
+                const data = await res.json();
+                alert(data.message || 'Fine-tuning complete');
+                await fetchModels();
+            } catch (e) {
+                alert('Fine-tuning failed');
+            } finally {
+                btn.disabled = false;
+                btn.innerText = 'Fine-tune Model';
+            }
+        }
+
+        async function runRollback() {
+            if (!confirm('Rollback to previous version?')) return;
+            const btn = document.getElementById('rollback-btn');
+            btn.disabled = true;
+            try {
+                const res = await fetch('/admin/api/models/rollback', { method: 'POST' });
+                const data = await res.json();
+                alert(data.message || 'Rollback complete');
+                await fetchModels();
+            } catch (e) {
+                alert('Rollback failed');
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        async function fetchExperiment() {
+            try {
+                const res = await fetch('/admin/api/experiment');
+                experimentConfig = await res.json();
+                renderExperiment();
+            } catch (e) {
+                console.error('Failed to fetch experiment:', e);
+            }
+        }
+
         function renderExperiment() {
             let variantsHtml = '';
             for (const [vid, v] of Object.entries(experimentConfig.variants || {})) {
                 variantsHtml += `
-                    <div style="padding: 0.5rem; border: 1px solid #eee; margin-bottom: 0.5rem; border-radius: 4px;">
-                        <strong>${vid}</strong>
-                        <div>Weight: <input type="number" step="0.1" value="${v.weight}" onchange="updateVariantWeight('${vid}', this.value)"></div>
-                         <button class="secondary" style="margin-top:0.5rem; font-size:0.8rem; padding: 2px 5px;" onclick="removeVariant('${vid}')">Remove</button>
+                    <div style="padding: 1rem; border: 1px solid var(--border); margin-bottom: 1rem; border-radius: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <strong>${vid}</strong><br>
+                            <small>${v.description || ''}</small>
+                        </div>
+                        <div style="display: flex; gap: 1rem; align-items: center;">
+                            Weight: <input type="number" step="0.1" value="${v.weight}" style="width: 70px;" onchange="updateVariantWeight('${vid}', this.value)">
+                            <button class="btn btn-outline" style="color: var(--danger)" onclick="removeVariant('${vid}')">Remove</button>
+                        </div>
                     </div>
                 `;
             }
 
             const html = `
-                <p><strong>Experiment:</strong> ${experimentConfig.experiment_name}</p>
-                <p><strong>Strategy:</strong> 
-                    <select onchange="updateStrategy(this.value)">
-                        <option value="random" ${experimentConfig.strategy === 'random' ? 'selected' : ''}>Random</option>
-                        <option value="session_hash" ${experimentConfig.strategy === 'session_hash' ? 'selected' : ''}>Session Hash</option>
-                        <option value="weighted" ${experimentConfig.strategy === 'weighted' ? 'selected' : ''}>Weighted</option>
-                    </select>
-                </p>
+                <div style="margin-bottom: 1.5rem;">
+                    <p><strong>Experiment Name:</strong> ${experimentConfig.experiment_name}</p>
+                    <p style="margin-top: 0.5rem;"><strong>Traffic Strategy:</strong> 
+                        <select onchange="updateStrategy(this.value)">
+                            <option value="random" ${experimentConfig.strategy === 'random' ? 'selected' : ''}>Random</option>
+                            <option value="session_hash" ${experimentConfig.strategy === 'session_hash' ? 'selected' : ''}>Session Hash</option>
+                            <option value="weighted" ${experimentConfig.strategy === 'weighted' ? 'selected' : ''}>Weighted</option>
+                        </select>
+                    </p>
+                </div>
                 <h3>Variants</h3>
-                ${variantsHtml || '<p>No active variants</p>'}
+                <div style="margin-top: 1rem;">
+                    ${variantsHtml || '<p>No active variants. Add a model from the Models section.</p>'}
+                </div>
             `;
             document.getElementById('experiment-config').innerHTML = html;
-        }
-
-        async function updateStatus(version, status) {
-            await fetch(`/admin/api/models/${version}/status`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status })
-            });
-            fetchModels();
-        }
-
-        async function runFinetune() {
-            const btn = document.getElementById('finetune-btn');
-            const originalText = btn.innerText;
-            btn.innerText = 'Fine-tuning...';
-            btn.disabled = true;
-
-            try {
-                const res = await fetch('/admin/api/models/finetune', { method: 'POST' });
-                const data = await res.json();
-                if (data.success) {
-                    alert(data.message);
-                    fetchModels();
-                } else {
-                    alert(data.message || 'Fine-tuning failed.');
-                }
-            } catch (e) {
-                alert('Error during fine-tuning');
-            } finally {
-                btn.innerText = originalText;
-                btn.disabled = false;
-            }
-        }
-
-        async function runRollback() {
-            if (!confirm('Are you sure you want to rollback to the previous model version?')) return;
-
-            const btn = document.getElementById('rollback-btn');
-            btn.disabled = true;
-
-            try {
-                const res = await fetch('/admin/api/models/rollback', { method: 'POST' });
-                const data = await res.json();
-                if (data.success) {
-                    alert(data.message);
-                    fetchModels();
-                } else {
-                    alert(data.error || 'Rollback failed.');
-                }
-            } catch (e) {
-                alert('Error during rollback');
-            } finally {
-                btn.disabled = false;
-            }
         }
 
         function addToExperiment(version) {
             const model = models.find(m => m.version === version);
             if (!experimentConfig.variants) experimentConfig.variants = {};
-
-            // Generate a variant ID (e.g. v1)
-            const vid = version;
-
-            experimentConfig.variants[vid] = {
-                variant_id: vid,
+            experimentConfig.variants[version] = {
+                variant_id: version,
                 model_path: model.model_path,
                 preprocessor_path: model.preprocessor_path,
                 weight: 1.0,
                 description: `Model ${version}`
             };
+            showSection('ab-testing');
             renderExperiment();
         }
 
@@ -303,7 +594,9 @@
         }
 
         function updateVariantWeight(vid, weight) {
-            experimentConfig.variants[vid].weight = parseFloat(weight);
+            if (experimentConfig.variants[vid]) {
+                experimentConfig.variants[vid].weight = parseFloat(weight);
+            }
         }
 
         function updateStrategy(newStrategy) {
@@ -311,18 +604,28 @@
         }
 
         async function saveExperimentConfig() {
-            await fetch('/admin/api/experiment/save', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(experimentConfig)
-            });
-            alert('Configuration saved!');
-            fetchExperiment();
+            try {
+                const res = await fetch('/admin/api/experiment/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(experimentConfig)
+                });
+                const data = await res.json();
+                if (data.success) alert('Experiment configuration saved!');
+                else alert('Failed to save configuration');
+            } catch (e) {
+                alert('Error saving configuration');
+            }
         }
 
-        fetchModels();
-        fetchExperiment();
+        function exportCSV() {
+            const start = document.getElementById('filter-start').value;
+            const end = document.getElementById('filter-end').value;
+            window.location.href = `/admin/api/export/csv?start_date=${start}&end_date=${end}`;
+        }
+
+        // Initialize
+        init();
     </script>
 </body>
-
 </html>

@@ -234,7 +234,12 @@ def predict() -> tuple[Dict[str, Any], int]:
                 prediction = Prediction(
                     input_data=json.dumps({'text': text}),
                     prediction_result=json.dumps(result),
-                    session_id=session_id
+                    session_id=session_id,
+                    text=text,
+                    sentiment=result.get('sentiment', 'unknown'),
+                    confidence=result.get('confidence', 0.0),
+                    variant_id=result.get('variant_id'),
+                    language=result.get('language')
                 )
                 db_session.add(prediction)
                 db_session.commit()
@@ -249,14 +254,6 @@ def predict() -> tuple[Dict[str, Any], int]:
             response_data['session_id'] = session_id
             response_data['prediction_id'] = prediction_id
             
-            # Save to analytics database
-            save_prediction(
-                text=text,
-                sentiment=result.get('sentiment', 'unknown'),
-                confidence=result.get('confidence', 0.0),
-                timestamp=timestamp
-            )
-                
             return jsonify(response_data), 200
             
         except Exception as e:
@@ -307,16 +304,14 @@ def predict_batch() -> tuple[Dict[str, Any], int]:
                     prediction = Prediction(
                         input_data=json.dumps({'text': text}),
                         prediction_result=json.dumps(result),
-                        session_id=session_id
-                    )
-                    db_session.add(prediction)
-                    
-                    # Also save to analytics database
-                    save_prediction(
+                        session_id=session_id,
                         text=text,
                         sentiment=result.get('sentiment', 'unknown'),
-                        confidence=result.get('confidence', 0.0)
+                        confidence=result.get('confidence', 0.0),
+                        variant_id=result.get('variant_id'),
+                        language=result.get('language')
                     )
+                    db_session.add(prediction)
                 db_session.commit()
                 db_session.close()
             except Exception as db_error:
