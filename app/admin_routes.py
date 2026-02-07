@@ -1,10 +1,12 @@
-from flask import Blueprint, jsonify, request, render_template
+from flask import Blueprint, jsonify, request, render_template, Response
 from src.registry import ModelRegistry
 from src.ab_testing.framework import ABTestingFramework, ModelVariant, TrafficSplitStrategy
 import os
 import logging
 from src.database import get_db_session
 from src.finetune import finetune_model
+from app.analytics import get_dashboard_stats, export_predictions_csv
+from datetime import datetime
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 logger = logging.getLogger(__name__)
@@ -12,6 +14,35 @@ logger = logging.getLogger(__name__)
 @admin_bp.route('/')
 def admin_dashboard():
     return render_template('admin.html')
+
+@admin_bp.route('/api/stats', methods=['GET'])
+def get_stats():
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    variant_id = request.args.get('variant_id')
+    language = request.args.get('language')
+    
+    if start_date: start_date = datetime.fromisoformat(start_date)
+    if end_date: end_date = datetime.fromisoformat(end_date)
+    
+    stats = get_dashboard_stats(start_date, end_date, variant_id, language)
+    return jsonify(stats)
+
+@admin_bp.route('/api/export/csv', methods=['GET'])
+def export_csv():
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    
+    if start_date: start_date = datetime.fromisoformat(start_date)
+    if end_date: end_date = datetime.fromisoformat(end_date)
+    
+    csv_data = export_predictions_csv(start_date, end_date)
+    
+    return Response(
+        csv_data,
+        mimetype="text/csv",
+        headers={"Content-disposition": f"attachment; filename=predictions_{datetime.now().strftime('%Y%m%d')}.csv"}
+    )
 
 @admin_bp.route('/api/models', methods=['GET'])
 def list_models():
